@@ -1,0 +1,4 @@
+CompileFlags:
+  CompilationDatabase: builddir/
+InlayHints:
+  Enabled: No
