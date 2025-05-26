@@ -282,9 +282,8 @@ static void key_focus_start(bool same_output, bool next) {
 		struct wl_list *list = next ? s.tmp_toplevel->link.next
 					    : s.tmp_toplevel->link.prev;
 		if (list == &s.toplevels) {
-			wlr_log(WLR_INFO, "skip head list");
-			list = next ? list->next : list->prev;
 			// skip head list
+			list = next ? list->next : list->prev;
 		}
 		s.tmp_toplevel = wl_container_of(list, s.tmp_toplevel, link);
 		output = toplevel_visible_on(s.tmp_toplevel);
@@ -331,7 +330,17 @@ static void key_focus_previous() {
 	key_focus_start(false, false);
 }
 
-static void key_close_window() {}
+static void key_close_window() {
+	struct ws_output *output = s.focused_output;
+	if (!output) {
+		return;
+	}
+	struct ws_toplevel *toplevel = s.focused_output->cur_toplevel;
+	if (!toplevel) {
+		return;
+	}
+	wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
+}
 
 static void key_quit() {
 	//
@@ -1050,14 +1059,6 @@ void handle_xdg_toplevel_decoration(struct wl_listener *, void *data) {
 //     wl_display_destroy(s.wl_display);
 // }
 
-void sigchld_handler(int sig) {
-	int status;
-	pid_t pid;
-	while ((pid = waitpid(sig, &status, WNOHANG)) > 0) {
-		// TODO
-	}
-}
-
 int main(int argc, char *argv[]) {
 	bool is_ok = true;
 
@@ -1102,8 +1103,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	struct sigaction sa;
-	sa.sa_handler = sigchld_handler;
-	sa.sa_flags = SA_NOCLDSTOP | SA_RESETHAND;
+	sa.sa_handler = SIG_IGN;
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGCHLD, &sa, NULL);
 
