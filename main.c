@@ -360,7 +360,7 @@ const struct ws_key_bind keys[] = {
 	},
 	{
 		WLR_MODIFIER_ALT | WLR_MODIFIER_SHIFT,
-		XKB_KEY_ISO_Left_Tab,
+		XKB_KEY_Tab,
 		key_focus_previous,
 	},
 	{
@@ -370,7 +370,7 @@ const struct ws_key_bind keys[] = {
 	},
 	{
 		WLR_MODIFIER_LOGO | WLR_MODIFIER_SHIFT,
-		XKB_KEY_ISO_Left_Tab,
+		XKB_KEY_Tab,
 		key_focus_same_previous,
 	},
 	{
@@ -393,6 +393,10 @@ const struct ws_key_bind keys[] = {
 static bool key_binding(uint32_t modifiers, xkb_keysym_t keysym) {
 	// xkb_keysym_from_name() can used to build config
 
+	// https://github.com/search?q=XKB_KEY_ISO_Left_Tab&type=code
+	if (keysym == XKB_KEY_ISO_Left_Tab) {
+		keysym = XKB_KEY_Tab;
+	}
 	for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
 		const struct ws_key_bind *key = &keys[i];
 		if (CLEANMASK(key->modifiers) != CLEANMASK(modifiers) ||
@@ -411,30 +415,19 @@ void keyboard_handle_key(struct wl_listener *listener, void *data) {
 	struct wlr_keyboard_key_event *event = data;
 	struct wlr_seat *seat = s.seat;
 
-	/* Translate libinput keycode -> xkbcommon */
 	xkb_keycode_t keycode = event->keycode + 8;
-	const xkb_keysym_t *keysym;
-	int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state,
-					   keycode, &keysym);
-	bool handled = false;
+	xkb_keysym_t keysym = xkb_state_key_get_one_sym(
+		keyboard->wlr_keyboard->xkb_state, keycode);
 	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
+
+	bool handled = false;
 	switch (event->state) {
 	case WL_KEYBOARD_KEY_STATE_PRESSED:
-		for (int i = 0; i < nsyms; i++) {
-			if (nsyms > 1) {
-				wlr_log(WLR_INFO, "nsyms number > 1, %d",
-					keysym[i]);
-			}
-			handled = key_binding(modifiers, keysym[i]) || handled;
-		}
+		handled = key_binding(modifiers, keysym) || handled;
 		break;
 	case WL_KEYBOARD_KEY_STATE_RELEASED:
-		for (int i = 0; i < nsyms; i++) {
-			if (keysym[i] == XKB_KEY_Alt_L ||
-			    keysym[i] == XKB_KEY_Super_L) {
-				key_focus_done();
-				break;
-			}
+		if (keysym == XKB_KEY_Alt_L || keysym == XKB_KEY_Super_L) {
+			key_focus_done();
 		}
 		break;
 	}
