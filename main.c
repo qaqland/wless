@@ -62,7 +62,7 @@ struct ws_server {
 	struct wl_listener new_xdg_popup;
 	struct wl_list toplevels; // ws_toplevel.link
 
-	struct ws_toplevel *tmp_toplevel; // TMP Alt+Tab
+	struct ws_toplevel *win_toplevel; // Win/Alt+Tab
 
 	struct wl_listener xdg_toplevel_decoration;
 
@@ -178,7 +178,19 @@ static void color_hex2rgba(const char *hex, float (*color)[4]) {
 	(*color)[3] = a / 255.0f;
 }
 
+static struct ws_output *toplevel_visible_on(struct ws_toplevel *toplevel) {
+	struct ws_output *output;
+	wl_list_for_each (output, &s.outputs, link) {
+		if (toplevel == output->cur_toplevel) {
+			return output;
+		}
+	}
+	return NULL;
+}
+
 static void focus_toplevel(struct ws_toplevel *toplevel) {
+	s.focused_output = toplevel_visible_on(toplevel);
+
 	if (!toplevel) {
 		return;
 	}
@@ -215,20 +227,32 @@ void xdg_toplevel_position(struct ws_output *output) {
 	if (!toplevel) {
 		return;
 	}
-	struct wlr_box output_box;
-	wlr_output_layout_get_box(s.output_layout, output->wlr_output,
-				  &output_box);
-	if (toplevel->xdg_toplevel->parent == NULL) {
-		// TODO is_primary
-	}
 	if (!toplevel->scene_tree) {
 		return;
 	}
-	wlr_scene_node_set_position(&toplevel->scene_tree->node, output_box.x,
-				    output_box.y);
-	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, output_box.width,
-				  output_box.height);
-	wlr_xdg_toplevel_set_maximized(toplevel->xdg_toplevel, true);
+	struct wlr_box output_box;
+	wlr_output_layout_get_box(s.output_layout, output->wlr_output,
+				  &output_box);
+
+	int new_x, new_y;
+
+	if (toplevel->xdg_toplevel->parent) {
+		// switch to new in wlroots-0.19
+		// https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/4788
+		struct wlr_xdg_surface *surface = toplevel->xdg_toplevel->base;
+		struct wlr_box box;
+		wlr_xdg_surface_get_geometry(surface, &box);
+		new_x = (output_box.width - box.width) / 2 + output_box.x;
+		new_y = (output_box.height - box.height) / 2 + output_box.y;
+	} else {
+		// normally, a toplevel can cover the whole output
+		wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel,
+					  output_box.width, output_box.height);
+		wlr_xdg_toplevel_set_maximized(toplevel->xdg_toplevel, true);
+		new_x = output_box.width;
+		new_y = output_box.height;
+	}
+	wlr_scene_node_set_position(&toplevel->scene_tree->node, new_x, new_y);
 }
 
 void xdg_toplevel_position_all() {
@@ -258,38 +282,28 @@ void keyboard_handle_modifiers(struct wl_listener *listener, void *) {
 					   &keyboard->wlr_keyboard->modifiers);
 }
 
-static struct ws_output *toplevel_visible_on(struct ws_toplevel *toplevel) {
-	struct ws_output *output;
-	wl_list_for_each (output, &s.outputs, link) {
-		if (toplevel == output->cur_toplevel) {
-			return output;
-		}
-	}
-	return NULL;
-}
-
 static void key_focus_start(bool same_output, bool next) {
 	if (wl_list_length(&s.toplevels) < 2) {
 		return;
 	}
-	if (!s.tmp_toplevel) {
-		s.tmp_toplevel = // FIXME
-			wl_container_of(s.toplevels.next, s.tmp_toplevel, link);
-	}
-
+	struct ws_toplevel *tmp_toplevel =
+		s.win_toplevel
+			? s.win_toplevel
+			: wl_container_of(s.toplevels.next, tmp_toplevel, link);
 	struct ws_output *output;
+
 	while (true) {
-		struct wl_list *list = next ? s.tmp_toplevel->link.next
-					    : s.tmp_toplevel->link.prev;
+		struct wl_list *list = next ? tmp_toplevel->link.next
+					    : tmp_toplevel->link.prev;
 		if (list == &s.toplevels) {
 			// skip head list
 			list = next ? list->next : list->prev;
 		}
-		s.tmp_toplevel = wl_container_of(list, s.tmp_toplevel, link);
-		output = toplevel_visible_on(s.tmp_toplevel);
+		tmp_toplevel = wl_container_of(list, tmp_toplevel, link);
+		output = toplevel_visible_on(tmp_toplevel);
 		if (!output) {
 			output = s.focused_output;
-			output->cur_toplevel = s.tmp_toplevel;
+			output->cur_toplevel = tmp_toplevel;
 			break; // catch "clean" toplevel
 		}
 		if (same_output && output != s.focused_output) {
@@ -298,16 +312,21 @@ static void key_focus_start(bool same_output, bool next) {
 		break;
 	}
 
-	wlr_scene_node_raise_to_top(&s.tmp_toplevel->scene_tree->node);
+	if (s.win_toplevel == tmp_toplevel) {
+		return;
+	}
+
+	s.win_toplevel = tmp_toplevel;
+	wlr_scene_node_raise_to_top(&s.win_toplevel->scene_tree->node);
 	// xdg_toplevel_position(output);
 }
 
 static void key_focus_done() {
-	if (!s.tmp_toplevel) {
+	if (!s.win_toplevel) {
 		return;
 	}
-	focus_toplevel(s.tmp_toplevel);
-	s.tmp_toplevel = NULL;
+	focus_toplevel(s.win_toplevel);
+	s.win_toplevel = NULL;
 }
 
 static void key_focus_same_next() {
@@ -863,9 +882,9 @@ void handle_xdg_toplevel_unmap(struct wl_listener *listener, void *) {
 	wl_list_for_each (output, &s.outputs, link) {
 		if (output->cur_toplevel == toplevel) {
 			output->cur_toplevel = NULL;
-			s.tmp_toplevel = wl_container_of(&toplevel->link,
-							 s.tmp_toplevel, link);
-			key_focus_next();
+			s.win_toplevel = wl_container_of(&toplevel->link,
+							 s.win_toplevel, link);
+			key_focus_same_next();
 			key_focus_done();
 		}
 	}
