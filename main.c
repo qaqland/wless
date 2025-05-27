@@ -13,6 +13,7 @@
 #include <wayland-util.h>
 #include <wlr/backend.h>
 #include <wlr/backend/drm.h>
+#include <wlr/backend/session.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
@@ -47,9 +48,11 @@
 struct ws_server {
 	// base
 	struct wl_display *wl_display;
+	struct wl_event_loop *wl_event_loop;
 	struct wlr_backend *backend;
 	struct wlr_renderer *renderer;
 	struct wlr_allocator *allocator;
+	struct wlr_session *session;
 
 	// scene
 	struct wlr_scene *scene;
@@ -420,7 +423,7 @@ const struct ws_key_bind keys[] = {
 	},
 };
 
-static bool key_binding(uint32_t modifiers, xkb_keysym_t keysym) {
+static bool key_bindings(uint32_t modifiers, xkb_keysym_t keysym) {
 	// xkb_keysym_from_name() can used to build config
 
 	// https://github.com/search?q=XKB_KEY_ISO_Left_Tab&type=code
@@ -440,6 +443,27 @@ static bool key_binding(uint32_t modifiers, xkb_keysym_t keysym) {
 	return false;
 }
 
+#define VT_LIST X(1) X(2) X(3) X(4) X(5) X(6) X(7) X(8) X(9) X(10) X(11) X(12)
+
+static bool key_change_vt(uint32_t modifiers, xkb_keysym_t keysym) {
+	if (modifiers != (WLR_MODIFIER_ALT | WLR_MODIFIER_CTRL)) {
+		return false;
+	}
+	int vt = 0;
+	switch (keysym) {
+#define X(NUM)                                                                 \
+	case XKB_KEY_XF86Switch_VT_##NUM:                                      \
+		vt = NUM;                                                      \
+		break;
+		VT_LIST
+#undef X
+	default:
+		return false;
+	}
+	wlr_session_change_vt(s.session, vt);
+	return true;
+}
+
 void keyboard_handle_key(struct wl_listener *listener, void *data) {
 	struct ws_keyboard *keyboard = wl_container_of(listener, keyboard, key);
 	struct wlr_keyboard_key_event *event = data;
@@ -453,7 +477,8 @@ void keyboard_handle_key(struct wl_listener *listener, void *data) {
 	bool handled = false;
 	switch (event->state) {
 	case WL_KEYBOARD_KEY_STATE_PRESSED:
-		handled = key_binding(modifiers, keysym) || handled;
+		handled = key_bindings(modifiers, keysym) ||
+			  key_change_vt(modifiers, keysym);
 		break;
 	case WL_KEYBOARD_KEY_STATE_RELEASED:
 		if (keysym == XKB_KEY_Alt_L || keysym == XKB_KEY_Super_L) {
@@ -535,6 +560,7 @@ void handle_cursor_button(struct wl_listener *, void *data) {
 	if (event->state != WL_POINTER_BUTTON_STATE_PRESSED) {
 		wlr_log(WLR_DEBUG, "event not pressed?");
 	}
+	// TODO move focus
 	wlr_seat_pointer_notify_button(s.seat, event->time_msec, event->button,
 				       event->state);
 }
@@ -1138,8 +1164,9 @@ int main(int argc, char *argv[]) {
 		goto error_quit;
 	}
 
-	s.backend = wlr_backend_autocreate(
-		wl_display_get_event_loop(s.wl_display), NULL);
+	s.wl_event_loop = wl_display_get_event_loop(s.wl_display);
+
+	s.backend = wlr_backend_autocreate(s.wl_event_loop, &s.session);
 	if (!s.backend) {
 		wlr_log(WLR_ERROR, "Failed to create wlr_backend");
 		goto error_quit;
