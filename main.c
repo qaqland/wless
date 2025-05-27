@@ -249,8 +249,8 @@ void xdg_toplevel_position(struct ws_output *output) {
 		wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel,
 					  output_box.width, output_box.height);
 		wlr_xdg_toplevel_set_maximized(toplevel->xdg_toplevel, true);
-		new_x = output_box.width;
-		new_y = output_box.height;
+		new_x = output_box.x;
+		new_y = output_box.y;
 	}
 	wlr_scene_node_set_position(&toplevel->scene_tree->node, new_x, new_y);
 }
@@ -363,6 +363,7 @@ static void key_close_window() {
 
 static void key_quit() {
 	//
+	wlr_log(WLR_INFO, "quit");
 	wl_display_terminate(s.wl_display);
 }
 
@@ -376,6 +377,7 @@ static void key_spawn_client(const char *exe) {
 }
 
 static void key_spawn_foot() {
+	wlr_log(WLR_INFO, "spawn foot");
 	const char *foot = "foot";
 	key_spawn_client(foot);
 }
