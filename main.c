@@ -1166,7 +1166,7 @@ int main(int argc, char *argv[]) {
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGCHLD, &sa, NULL);
 
-	const char *color_str = "#292b38";
+	const char *color_str = "#242424";
 	float color_background[4];
 	color_hex2rgba(color_str, &color_background);
 
