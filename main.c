@@ -307,6 +307,8 @@ void keyboard_handle_modifiers(struct wl_listener *listener, void *) {
 }
 
 static void key_focus_start(bool same_output, bool next) {
+	assert(s.focused_output);
+
 	if (wl_list_length(&s.toplevels) < 2) {
 		return;
 	}
@@ -378,11 +380,15 @@ static void key_close_window() {
 	if (!output) {
 		return;
 	}
-	struct ws_toplevel *toplevel = s.focused_output->cur_toplevel;
+	struct ws_toplevel *toplevel = output->cur_toplevel;
 	if (!toplevel) {
 		return;
 	}
+	output->cur_toplevel = NULL;
 	wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
+
+	key_focus_same_next();
+	key_focus_done();
 }
 
 static void key_quit() {
