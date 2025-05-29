@@ -26,12 +26,15 @@
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_pointer.h>
+#include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_server_decoration.h>
 #include <wlr/types/wlr_subcompositor.h>
+#include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
+#include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
@@ -321,7 +324,7 @@ static void key_focus_start(bool same_output, bool next) {
 
 	s.win_toplevel = tmp_toplevel;
 	wlr_scene_node_raise_to_top(&s.win_toplevel->scene_tree->node);
-	// xdg_toplevel_position(output);
+	xdg_toplevel_position(output);
 }
 
 static void key_focus_done() {
@@ -779,6 +782,7 @@ void handle_output_manager_test(struct wl_listener *, void *data) {
 void handle_output_manager_apply(struct wl_listener *, void *data) {
 	struct wlr_output_configuration_v1 *config = data;
 	output_manager_apply_config(config, false);
+	xdg_toplevel_position_all();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -844,6 +848,7 @@ void handle_new_output(struct wl_listener *, void *data) {
 
 	struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
 	if (mode) {
+		// FIXME what if output doesn't support mode?
 		wlr_output_state_set_mode(&state, mode);
 	}
 	wlr_output_commit_state(wlr_output, &state);
@@ -1193,7 +1198,7 @@ int main(int argc, char *argv[]) {
 	// who will call these destroy event?
 	// wl_display_add_destroy_listener()
 
-	wlr_compositor_create(s.wl_display, 5, s.renderer);
+	wlr_compositor_create(s.wl_display, 6, s.renderer);
 
 	wlr_subcompositor_create(s.wl_display);
 
@@ -1215,6 +1220,10 @@ int main(int argc, char *argv[]) {
 		wlr_scene_rect_create(&s.scene->tree, 0, 0, color_background);
 	s.scene_output_layout =
 		wlr_scene_attach_output_layout(s.scene, s.output_layout);
+
+	wlr_xdg_output_manager_v1_create(s.wl_display, s.output_layout);
+	wlr_viewporter_create(s.wl_display);
+	wlr_presentation_create(s.wl_display, s.backend);
 
 	// wlr-randr
 	s.output_manager_v1 = wlr_output_manager_v1_create(s.wl_display);
