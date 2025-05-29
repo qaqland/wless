@@ -277,6 +277,24 @@ void xdg_toplevel_position_all() {
 	wlr_scene_node_lower_to_bottom(&s.scene_background->node);
 }
 
+void update_seat_caps(void) {
+	// TODO call it when device destroy
+	uint32_t caps = 0;
+
+	// TODO keyboard_groups vs keyboards
+	if (!wl_list_empty(&s.keyboard_groups)) {
+		caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+	}
+	if (!wl_list_empty(&s.pointers)) {
+		caps |= WL_SEAT_CAPABILITY_POINTER;
+	}
+	wlr_seat_set_capabilities(s.seat, caps);
+
+	// lazy loading cursor image, set in process_cursor_motion
+	// handle_cursor_motion_absolute or handle_cursor_motion_relative
+	wlr_cursor_unset_image(s.cursor);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void keyboard_handle_modifiers(struct wl_listener *listener, void *) {
@@ -612,27 +630,6 @@ void handle_cursor_frame(struct wl_listener *, void *) {
 	wlr_seat_pointer_notify_frame(s.seat);
 }
 
-void update_seat_caps(void) {
-	uint32_t caps = 0;
-
-	if (!wl_list_empty(&s.keyboard_groups)) {
-		caps |= WL_SEAT_CAPABILITY_KEYBOARD;
-	}
-	if (!wl_list_empty(&s.pointers)) {
-		caps |= WL_SEAT_CAPABILITY_POINTER;
-	}
-	wlr_seat_set_capabilities(s.seat, caps);
-
-	// TODO init cursor image when initial:
-	// handle_cursor_motion_absolute or
-	// handle_cursor_motion_relative
-	if ((caps & WL_SEAT_CAPABILITY_POINTER) == 0) {
-		wlr_cursor_unset_image(s.cursor);
-	} else {
-		wlr_cursor_set_xcursor(s.cursor, s.xcursor_manager, "default");
-	}
-}
-
 // device
 void handle_new_keyboard(struct wlr_input_device *device) {
 	struct wlr_keyboard *wlr_keyboard =
@@ -911,17 +908,21 @@ void handle_xdg_toplevel_map(struct wl_listener *listener, void *) {
 void handle_xdg_toplevel_unmap(struct wl_listener *listener, void *) {
 	struct ws_toplevel *toplevel =
 		wl_container_of(listener, toplevel, unmap);
+	wl_list_remove(&toplevel->link);
+
+	if (s.win_toplevel == toplevel) {
+		s.win_toplevel = NULL;
+		key_focus_same_next();
+	}
+
 	struct ws_output *output;
 	wl_list_for_each (output, &s.outputs, link) {
 		if (output->cur_toplevel == toplevel) {
 			output->cur_toplevel = NULL;
-			s.win_toplevel = wl_container_of(&toplevel->link,
-							 s.win_toplevel, link);
 			key_focus_same_next();
 			key_focus_done();
 		}
 	}
-	wl_list_remove(&toplevel->link);
 }
 
 // ws_toplevel.commit (xdg_toplevel->base->surface->events.commit)
