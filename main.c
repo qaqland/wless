@@ -348,7 +348,24 @@ static void key_focus_start(bool same_output, bool next) {
 	xdg_toplevel_position(output);
 }
 
+static void log_output() {
+	struct ws_output *output = s.focused_output;
+	assert(output);
+
+	wlr_log(WLR_DEBUG, "[output] focused on: %s, win on: %s",
+		output->wlr_output->name,
+		s.win_toplevel ? s.win_toplevel->xdg_toplevel->title : "empty");
+
+	wl_list_for_each (output, &s.outputs, link) {
+		wlr_log(WLR_DEBUG, "[output] %s:%s", output->wlr_output->name,
+			output->cur_toplevel
+				? output->cur_toplevel->xdg_toplevel->title
+				: "empty");
+	}
+}
+
 static void key_focus_done() {
+	log_output();
 	if (!s.win_toplevel) {
 		return;
 	}
@@ -356,24 +373,28 @@ static void key_focus_done() {
 	s.win_toplevel = NULL;
 }
 
-static void key_focus_same_next() {
-	// same_output, next
+static void key_focus_next_window_cur() {
+	log_output();
 	key_focus_start(true, true);
+	log_output();
 }
 
-static void key_focus_same_previous() {
-	// same_output, previous
+static void key_focus_prev_window_cur() {
+	log_output();
 	key_focus_start(true, false);
+	log_output();
 }
 
-static void key_focus_next() {
-	// next
+static void key_focus_next_window_all() {
+	log_output();
 	key_focus_start(false, true);
+	log_output();
 }
 
-static void key_focus_previous() {
-	// previous
+static void key_focus_prev_window_all() {
+	log_output();
 	key_focus_start(false, false);
+	log_output();
 }
 
 static void key_close_window() {
@@ -388,13 +409,13 @@ static void key_close_window() {
 	output->cur_toplevel = NULL;
 	wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
 
-	key_focus_same_next();
+	// FIXME: bug here, win+w and alt+tab same time
+	key_focus_next_window_cur();
 	key_focus_done();
 }
 
 static void key_quit() {
-	//
-	wlr_log(WLR_INFO, "quit");
+	// TODO: kill all clients?
 	wl_display_terminate(s.wl_display);
 }
 
@@ -408,32 +429,49 @@ static void key_spawn_client(const char *exe) {
 }
 
 static void key_spawn_foot() {
-	wlr_log(WLR_INFO, "spawn foot");
 	const char *foot = "foot";
 	key_spawn_client(foot);
 }
 
-// TODO:
-// - tidy function name
-// - add focus-output-next
-// - add focus-output-next-move
+#define TODO NULL
 
 #define KEY_FUNC_LIST                                                          \
-	X("focus-same-next", key_focus_same_next)                              \
-	X("focus-same-previous", key_focus_same_previous)
+	X("focus-next-window-cur", key_focus_next_window_cur)                  \
+	X("focus-prev-window-cur", key_focus_prev_window_cur)                  \
+	X("focus-next-window-all", key_focus_next_window_all)                  \
+	X("focus-prev-window-all", key_focus_prev_window_all)                  \
+	X("focus-next-output", TODO)                                           \
+	X("focus-prev-output", TODO)                                           \
+	X("focus-next-output-move", TODO)                                      \
+	X("focus-prev-output-move", TODO)                                      \
+	X("spawn-terminal", key_spawn_foot)                                    \
+	X("spawn-menu", TODO)                                                  \
+	X("close-window", key_close_window)                                    \
+	X("quit", key_quit)
 
 static void (*name2func(const char *name))(void) {
 	if (!name) {
 		printf(""
-#define X(STR, FUNC) STR "\n"
+#define X(NAME, FUNC) NAME "\n"
 		       KEY_FUNC_LIST
 #undef X
 		);
 		return NULL;
 	}
-#define X(STR, FUNC)                                                           \
-	if (strcmp(STR, name) == 0) {                                          \
+#define X(NAME, FUNC)                                                          \
+	if (strcmp(NAME, name) == 0) {                                         \
 		return FUNC;                                                   \
+	}
+	KEY_FUNC_LIST
+#undef X
+	return NULL;
+}
+
+static const char *func2name(void func(void)) {
+	assert(func);
+#define X(NAME, FUNC)                                                          \
+	if (FUNC == func) {                                                    \
+		return NAME;                                                   \
 	}
 	KEY_FUNC_LIST
 #undef X
@@ -444,22 +482,22 @@ const struct ws_key_bind keys[] = {
 	{
 		WLR_MODIFIER_ALT,
 		XKB_KEY_Tab,
-		key_focus_next,
+		key_focus_next_window_all,
 	},
 	{
 		WLR_MODIFIER_ALT | WLR_MODIFIER_SHIFT,
 		XKB_KEY_Tab,
-		key_focus_previous,
+		key_focus_prev_window_all,
 	},
 	{
 		WLR_MODIFIER_LOGO,
 		XKB_KEY_Tab,
-		key_focus_same_next,
+		key_focus_next_window_cur,
 	},
 	{
 		WLR_MODIFIER_LOGO | WLR_MODIFIER_SHIFT,
 		XKB_KEY_Tab,
-		key_focus_same_previous,
+		key_focus_prev_window_all,
 	},
 	{
 		WLR_MODIFIER_LOGO,
@@ -491,7 +529,10 @@ static bool key_bindings(uint32_t modifiers, xkb_keysym_t keysym) {
 		    key->keysym != keysym) {
 			continue;
 		}
+		const char *name = func2name(key->func);
+		wlr_log(WLR_DEBUG, "[key] >>> %s", name);
 		key->func();
+		wlr_log(WLR_DEBUG, "[key] <<< %s", name);
 		return true;
 	}
 
@@ -946,14 +987,14 @@ void handle_xdg_toplevel_unmap(struct wl_listener *listener, void *) {
 
 	if (s.win_toplevel == toplevel) {
 		s.win_toplevel = NULL;
-		key_focus_same_next();
+		key_focus_next_window_cur();
 	}
 
 	struct ws_output *output;
 	wl_list_for_each (output, &s.outputs, link) {
 		if (output->cur_toplevel == toplevel) {
 			output->cur_toplevel = NULL;
-			key_focus_same_next();
+			key_focus_next_window_cur();
 			key_focus_done();
 		}
 	}
