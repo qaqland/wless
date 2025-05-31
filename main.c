@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -410,6 +411,33 @@ static void key_spawn_foot() {
 	wlr_log(WLR_INFO, "spawn foot");
 	const char *foot = "foot";
 	key_spawn_client(foot);
+}
+
+// TODO:
+// - tidy function name
+// - add focus-output-next
+// - add focus-output-next-move
+
+#define KEY_FUNC_LIST                                                          \
+	X("focus-same-next", key_focus_same_next)                              \
+	X("focus-same-previous", key_focus_same_previous)
+
+static void (*name2func(const char *name))(void) {
+	if (!name) {
+		printf(""
+#define X(STR, FUNC) STR "\n"
+		       KEY_FUNC_LIST
+#undef X
+		);
+		return NULL;
+	}
+#define X(STR, FUNC)                                                           \
+	if (strcmp(STR, name) == 0) {                                          \
+		return FUNC;                                                   \
+	}
+	KEY_FUNC_LIST
+#undef X
+	return NULL;
 }
 
 const struct ws_key_bind keys[] = {
