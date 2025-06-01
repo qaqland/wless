@@ -308,6 +308,8 @@ void keyboard_handle_modifiers(struct wl_listener *listener, void *) {
 }
 
 static void key_focus_start(bool same_output, bool next) {
+#define HEAD "key-focus-start: "
+
 	assert(s.focused_output);
 
 	if (wl_list_length(&s.toplevels) < 2) {
@@ -323,45 +325,50 @@ static void key_focus_start(bool same_output, bool next) {
 		struct wl_list *list = next ? tmp_toplevel->link.next
 					    : tmp_toplevel->link.prev;
 		if (list == &s.toplevels) {
-			// skip head list
+			wlr_log(WLR_DEBUG, HEAD "skip head node");
 			list = next ? list->next : list->prev;
 		}
 		tmp_toplevel = wl_container_of(list, tmp_toplevel, link);
+		const char *tmp_name = tmp_toplevel->xdg_toplevel->title;
+		wlr_log(WLR_DEBUG, HEAD "checking %s", tmp_name);
+
 		output = toplevel_visible_on(tmp_toplevel);
+		wlr_log(WLR_DEBUG, HEAD "\tit's shown on %s",
+			output->wlr_output->name);
 		if (!output) {
+			wlr_log(WLR_DEBUG, HEAD "\tcapture, it's homeless");
 			output = s.focused_output;
 			output->cur_toplevel = tmp_toplevel;
-			break; // catch "clean" toplevel
+			break;
 		}
 		if (same_output && output != s.focused_output) {
-			continue; // skip "other" toplevel
+			wlr_log(WLR_DEBUG, HEAD "\tignore, it's employed");
+			continue;
 		}
 		break;
 	}
 
 	if (s.win_toplevel == tmp_toplevel) {
+		assert(same_output);
+		wlr_log(WLR_DEBUG, HEAD "\tignore, only one free window");
 		return;
 	}
 
 	s.win_toplevel = tmp_toplevel;
 	wlr_scene_node_raise_to_top(&s.win_toplevel->scene_tree->node);
 	xdg_toplevel_position(output);
+#undef HEAD
 }
 
 static void log_output() {
 	struct ws_output *output = s.focused_output;
 	assert(output);
 
-	wlr_log(WLR_DEBUG, "[output] focused on: %s, win on: %s",
+	wlr_log(WLR_DEBUG, "focused on %s, cur_toplevel: %s, win_toplevel: %s",
 		output->wlr_output->name,
-		s.win_toplevel ? s.win_toplevel->xdg_toplevel->title : "empty");
-
-	wl_list_for_each (output, &s.outputs, link) {
-		wlr_log(WLR_DEBUG, "[output] %s:%s", output->wlr_output->name,
-			output->cur_toplevel
-				? output->cur_toplevel->xdg_toplevel->title
-				: "empty");
-	}
+		output->cur_toplevel ? output->cur_toplevel->xdg_toplevel->title
+				     : "NULL",
+		s.win_toplevel ? s.win_toplevel->xdg_toplevel->title : "NULL");
 }
 
 static void key_focus_done() {
@@ -371,37 +378,29 @@ static void key_focus_done() {
 	}
 	focus_toplevel(s.win_toplevel);
 	s.win_toplevel = NULL;
+	log_output();
 }
 
 static void key_focus_next_window_cur() {
-	log_output();
 	key_focus_start(true, true);
-	log_output();
 }
 
 static void key_focus_prev_window_cur() {
-	log_output();
 	key_focus_start(true, false);
-	log_output();
 }
 
 static void key_focus_next_window_all() {
-	log_output();
 	key_focus_start(false, true);
-	log_output();
 }
 
 static void key_focus_prev_window_all() {
-	log_output();
 	key_focus_start(false, false);
-	log_output();
 }
 
 static void key_close_window() {
 	struct ws_output *output = s.focused_output;
-	if (!output) {
-		return;
-	}
+	assert(output);
+
 	struct ws_toplevel *toplevel = output->cur_toplevel;
 	if (!toplevel) {
 		return;
@@ -410,6 +409,7 @@ static void key_close_window() {
 	wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
 
 	// FIXME: bug here, win+w and alt+tab same time
+	key_focus_done();
 	key_focus_next_window_cur();
 	key_focus_done();
 }
@@ -530,9 +530,9 @@ static bool key_bindings(uint32_t modifiers, xkb_keysym_t keysym) {
 			continue;
 		}
 		const char *name = func2name(key->func);
-		wlr_log(WLR_DEBUG, "[key] >>> %s", name);
+		wlr_log(WLR_DEBUG, ">>> %s", name);
 		key->func();
-		wlr_log(WLR_DEBUG, "[key] <<< %s", name);
+		wlr_log(WLR_DEBUG, "<<< %s", name);
 		return true;
 	}
 
@@ -578,12 +578,16 @@ void keyboard_handle_key(struct wl_listener *listener, void *data) {
 		break;
 	case WL_KEYBOARD_KEY_STATE_RELEASED:
 		if (keysym == XKB_KEY_Alt_L || keysym == XKB_KEY_Super_L) {
+			wlr_log(WLR_DEBUG, "[key] RELEASE: Alt_L / Super_L");
 			key_focus_done();
 		}
 		break;
 	}
 
 	if (handled) {
+		static char name_buf[64];
+		xkb_keysym_get_name(keysym, name_buf, 64);
+		wlr_log(WLR_DEBUG, "[key] HANDLED: %s", name_buf);
 		return;
 	}
 
