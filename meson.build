@@ -11,12 +11,16 @@ add_project_arguments(
     language: 'c',
 )
 
+if get_option('buildtype').startswith('debug')
+    add_project_arguments('-DDEBUG', language: 'c')
+endif
+
 sources = files('main.c')
 
 subdir('protocol')
 
 wayland_server = dependency('wayland-server')
-wlroots = dependency('wlroots-0.18')
+wlroots = dependency('wlroots-0.19')
 xkbcommon = dependency('xkbcommon')
 
 executable(
