@@ -173,6 +173,9 @@ struct ws_key_bind {
 };
 
 static void color_hex2rgba(const char *hex, float (*color)[4]) {
+	assert(hex);
+	assert(color);
+
 	unsigned short r, g, b, a;
 	r = g = b = 0;
 	a = 255;
@@ -186,50 +189,79 @@ static void color_hex2rgba(const char *hex, float (*color)[4]) {
 	(*color)[3] = a / 255.0f;
 }
 
-static void focus_client(struct ws_client *client) {
+static struct wlr_surface *client_surface(struct ws_client *client) {
+	return client->xdg_toplevel->base->surface;
+}
+
+static struct ws_client *client_try_from_surface(struct wlr_surface *surface) {
+	if (!surface) {
+		return NULL;
+	}
+
+	struct wlr_surface *root_surface =
+		wlr_surface_get_root_surface(surface);
+	struct wlr_xdg_surface *xdg_surface =
+		wlr_xdg_surface_try_from_wlr_surface(root_surface);
+
+	if (!xdg_surface) {
+		return NULL;
+	}
+
+	switch (xdg_surface->role) {
+	case WLR_XDG_SURFACE_ROLE_TOPLEVEL:
+		struct wlr_scene_tree *tree = xdg_surface->data;
+		return tree->node.data;
+	case WLR_XDG_SURFACE_ROLE_POPUP:
+		if (!xdg_surface->popup) {
+			return NULL;
+		}
+		if (!xdg_surface->popup->parent) {
+			return NULL;
+		}
+		xdg_surface = wlr_xdg_surface_try_from_wlr_surface(
+			xdg_surface->popup->parent);
+		assert(xdg_surface); // TODO
+		return client_try_from_surface(xdg_surface->popup->parent);
+	case WLR_XDG_SURFACE_ROLE_NONE:
+		return NULL;
+	}
+}
+
+static const char *client_appid(struct ws_client *client) {
+	const char *appid = client->xdg_toplevel->app_id;
+	return appid ? appid : "empty_id";
+}
+
+static const char *client_title(struct ws_client *client) {
+	const char *title = client->xdg_toplevel->title;
+	return title ? title : "empty_title";
+}
+
+static void focus_client(struct ws_client *client, bool sure) {
 	assert(client);
 	assert(client->output);
 
-	s.cur_client = client;
-	s.cur_output = client->output;
+	wlr_scene_node_raise_to_top(&client->scene_tree->node);
 
-	// assert(client->output->cur_client == client);
-	client->output->cur_client = client;
+	if (!sure) {
+		s.win_client = client;
+		return;
+	}
 
+	struct wlr_surface *surface = client_surface(client);
+
+	// TODO 之前的焦点应该保存在哪里？
 	struct wlr_surface *prev_surface =
 		s.seat->keyboard_state.focused_surface;
-	struct wlr_surface *surface = client->xdg_toplevel->base->surface;
 
 	if (prev_surface == surface) {
 		return;
 	}
 
-	do {
-		// deal with prev_surface & prev_client
-		if (!prev_surface) {
-			break;
-		}
-		struct wlr_xdg_toplevel *prev_toplevel =
-			wlr_xdg_toplevel_try_from_wlr_surface(prev_surface);
-		if (!prev_toplevel) {
-			break;
-		}
-		wlr_xdg_toplevel_set_activated(prev_toplevel, false);
-
-		struct wlr_scene_tree *prev_scene_tree =
-			prev_toplevel->base->data;
-		struct ws_client *prev_client = prev_scene_tree->node.data;
-		if (prev_client->output != client->output) {
-			break;
-		}
-		// disable all other in the same output
-		prev_client->output = NULL;
-		wlr_scene_node_set_enabled(&prev_client->scene_tree->node,
-					   false);
-	} while (0);
-
-	// wlr_scene_node_raise_to_top(&client->scene_tree->node);
-	wlr_scene_node_set_enabled(&client->scene_tree->node, true);
+	s.cur_client = client;
+	s.win_client = NULL;
+	s.cur_output = client->output;
+	s.cur_output->cur_client = client;
 
 	wl_list_remove(&client->link);
 	wl_list_insert(&s.clients, &client->link);
@@ -239,26 +271,42 @@ static void focus_client(struct ws_client *client) {
 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(s.seat);
 	if (keyboard) {
 		wlr_seat_keyboard_notify_enter(
-			s.seat, client->xdg_toplevel->base->surface,
-			keyboard->keycodes, keyboard->num_keycodes,
-			&keyboard->modifiers);
+			s.seat, surface, keyboard->keycodes,
+			keyboard->num_keycodes, &keyboard->modifiers);
 	}
+
+	// deal with prev_surface
+	if (!prev_surface) {
+		return;
+	}
+	struct wlr_xdg_toplevel *prev_toplevel =
+		wlr_xdg_toplevel_try_from_wlr_surface(prev_surface);
+	if (!prev_toplevel) {
+		return;
+	}
+	wlr_xdg_toplevel_set_activated(prev_toplevel, false);
 }
 
 void client_position(struct ws_client *client) {
 	assert(client);
-	assert(client->output);
+
+	// assert(client->output);
+	if (!client->output) {
+		client->output = s.cur_output;
+	}
 
 	if (!client->scene_tree) {
 		return;
 	}
 
+	// 该函数应当不是很经常被调用，因此实时获得显示器尺寸
 	struct wlr_box output_box;
 	wlr_output_layout_get_box(s.output_layout, client->output->wlr_output,
 				  &output_box);
 
 	int new_x, new_y;
 
+	// TODO 为什么不使用 xdg_surface->role
 	if (client->xdg_toplevel->parent) {
 		struct wlr_box box = client->xdg_toplevel->base->geometry;
 		new_x = (output_box.width - box.width) / 2 + output_box.x;
@@ -267,23 +315,6 @@ void client_position(struct ws_client *client) {
 		// normally, a toplevel can cover the whole output
 		wlr_xdg_toplevel_set_size(client->xdg_toplevel,
 					  output_box.width, output_box.height);
-		struct wlr_box box = {
-			.x = 0,
-			.y = 0,
-			.width = client->xdg_toplevel->current.width,
-			.height = client->xdg_toplevel->current.height,
-		};
-		wlr_log(WLR_INFO,
-			"client %s(%s), now %dx%d, max %dx%d, min %dx%d",
-			client->xdg_toplevel->title,
-			client->xdg_toplevel->app_id, box.width, box.height,
-			client->xdg_toplevel->current.max_width,
-			client->xdg_toplevel->current.max_height,
-			client->xdg_toplevel->current.min_width,
-			client->xdg_toplevel->current.min_height);
-		// TODO
-		// 1. what if client limit their geometry
-		// 2. do we need to send maximize event?
 		wlr_xdg_toplevel_set_maximized(client->xdg_toplevel, true);
 		new_x = output_box.x;
 		new_y = output_box.y;
@@ -294,9 +325,6 @@ void client_position(struct ws_client *client) {
 void client_position_all() {
 	struct ws_client *client;
 	wl_list_for_each (client, &s.clients, link) {
-		if (!client->output) {
-			continue;
-		}
 		client_position(client);
 	}
 }
@@ -330,118 +358,97 @@ void keyboard_handle_modifiers(struct wl_listener *listener, void *) {
 					   &keyboard->wlr_keyboard->modifiers);
 }
 
-static struct ws_client *checkout_client(bool next,
-					 struct ws_client *prev_client,
-					 struct ws_output *want_output) {
+static struct ws_client *checkout_client(bool next, bool cur) {
+	struct ws_client *prev_client = s.win_client;
+	struct ws_output *want_output = s.cur_output;
 
 	if (wl_list_length(&s.clients) < 2) {
 		return false;
 	}
-	struct ws_client *tmp_client = NULL;
-	struct wl_list *link =
+
+	struct ws_client *temp_client = NULL;
+	struct wl_list *client_link =
 		prev_client ? &prev_client->link : s.clients.next;
 
 	for (;;) {
-		link = next ? link->next : link->prev;
-		if (link == &s.clients) {
+		client_link = next ? client_link->next : client_link->prev;
+		if (client_link == &s.clients) {
 			continue;
 		}
-		tmp_client = wl_container_of(link, tmp_client, link);
 
-		if (!tmp_client->output) {
-			break;
-		}
-		if (want_output && tmp_client->output != want_output) {
+		temp_client = wl_container_of(client_link, temp_client, link);
+		assert(temp_client->output);
+
+		if (cur && temp_client->output != want_output) {
 			continue;
 		}
 		break;
 	}
 
-	assert(tmp_client);
+	assert(temp_client);
 
-	if (prev_client == tmp_client) {
-		assert(want_output);
+	if (prev_client == temp_client) {
+		assert(cur);
 		return NULL;
 	}
 
-	return tmp_client;
+	return temp_client;
 }
 
 static void key_focus_done() {
 	if (!s.win_client) {
 		return;
 	}
-	focus_client(s.win_client);
-	s.win_client = NULL;
+	focus_client(s.win_client, true);
 }
 
 static void key_focus_next_window_cur() {
-	struct ws_output *output = s.cur_output;
-	struct ws_client *client = checkout_client(true, s.win_client, output);
+	struct ws_client *client = checkout_client(true, true);
 	if (!client) {
 		return;
 	}
-	client->output = output;
-	if (s.win_client) {
-		s.win_client->output = NULL;
-	}
-	s.win_client = client;
-
-	client_position(s.win_client);
-	wlr_scene_node_raise_to_top(&s.win_client->scene_tree->node);
+	focus_client(client, false);
 }
 
 static void key_focus_prev_window_cur() {
-	struct ws_output *output = s.cur_output;
-	struct ws_client *client = checkout_client(false, s.win_client, output);
+	struct ws_client *client = checkout_client(false, true);
 	if (!client) {
 		return;
 	}
-	client->output = output;
-	s.win_client = client;
-
-	client_position(s.win_client);
-	wlr_scene_node_raise_to_top(&s.win_client->scene_tree->node);
+	focus_client(client, false);
 }
 
 static void key_focus_next_window_all() {
-	struct ws_client *client = checkout_client(true, s.win_client, NULL);
+	struct ws_client *client = checkout_client(true, false);
 	if (!client) {
 		return;
 	}
-	if (!client->output) {
-		client->output = s.cur_output;
-	}
-	s.win_client = client;
-
-	client_position(s.win_client);
-	wlr_scene_node_raise_to_top(&s.win_client->scene_tree->node);
+	focus_client(client, false);
 }
 
 static void key_focus_prev_window_all() {
-	struct ws_client *client = checkout_client(false, s.win_client, NULL);
+	struct ws_client *client = checkout_client(false, false);
 	if (!client) {
 		return;
 	}
-	if (!client->output) {
-		client->output = s.cur_output;
-	}
-	s.win_client = client;
-
-	client_position(s.win_client);
-	wlr_scene_node_raise_to_top(&s.win_client->scene_tree->node);
+	focus_client(client, false);
 }
 
 static void key_close_window() {
-	struct ws_client *client = s.cur_client;
-	s.cur_client = NULL;
+	if (wl_list_empty(&s.clients)) {
+		return;
+	}
+	struct ws_client *client = s.win_client ? s.win_client : s.cur_client;
+	assert(client);
 	wlr_xdg_toplevel_send_close(client->xdg_toplevel);
 
-	// FIXME: bug here, win+w and alt+tab same time
-	if (s.win_client == client) {
+	struct ws_client *next_client = checkout_client(true, false);
+	if (next_client) {
+		focus_client(next_client, true);
+	} else {
+		s.cur_client = NULL;
 		s.win_client = NULL;
 	}
-	key_focus_next_window_all();
 }
 
 static void key_quit() {
@@ -711,7 +718,7 @@ static void process_cursor_motion(uint32_t time) {
 	struct ws_client *client = desktop_toplevel_at(s.cursor->x, s.cursor->y,
 						       &surface, &sx, &sy);
 	if (client) {
-		focus_client(client);
+		focus_client(client, true);
 	} else {
 		wlr_cursor_set_xcursor(s.cursor, s.xcursor_manager, "default");
 	}
@@ -944,7 +951,8 @@ void handle_output_destroy(struct wl_listener *listener, void *) {
 		// TODO
 	}
 
-	// wlr_scene_output_layout should remove scene_output automatically
+	// wlr_scene_output_layout should remove scene_output
+	// automatically
 	wlr_output_layout_remove(s.output_layout, output->wlr_output);
 	free(output);
 
@@ -1022,9 +1030,8 @@ void handle_xdg_toplevel_map(struct wl_listener *listener, void *) {
 
 	wl_list_insert(&s.clients, &client->link);
 
-	// wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
 	client_position(client);
-	focus_client(client);
+	focus_client(client, true);
 }
 
 // ws_toplevel.unmap (xdg_toplevel->base->surface->events.unmap)
@@ -1070,7 +1077,8 @@ void handle_xdg_toplevel_destroy(struct wl_listener *listener, void *) {
 	free(client);
 }
 
-// ws_toplevel.request_fullscreen (xdg_toplevel->events.request_fullscreen)
+// ws_toplevel.request_fullscreen
+// (xdg_toplevel->events.request_fullscreen)
 void handle_xdg_toplevel_request_fullscreen(struct wl_listener *listener,
 					    void *) {
 	struct ws_client *client =
