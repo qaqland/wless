@@ -2,6 +2,19 @@
 
 window less, wlroots based wayland compositor.
 
+## Compile
+
+wless has the following dependencies:
+
+- wayland-protocols
+- wlr-protocols
+- wlroots-dev
+
+And it works well with:
+
+- foot
+- wmenu
+
 ## Key bindings
 
 - `Alt + Tab` 切换到下一个窗口，从近到远
@@ -26,4 +39,3 @@ window less, wlroots based wayland compositor.
 ### TODO
 
 - <https://github.com/emersion/kanshi>
-

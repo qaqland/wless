@@ -4,21 +4,27 @@ wayland_scanner = find_program(
     native: true,
 )
 
-wayland_protocols_dep = dependency('wayland-protocols')
-wayland_protocols_dir = wayland_protocols_dep.get_variable('pkgdatadir')
+wl_protocols_dep = dependency('wayland-protocols')
+wl_protocols_dir = wl_protocols_dep.get_variable('pkgdatadir')
 
-protocols = {'xdg-shell': 'stable/xdg-shell/xdg-shell.xml'}
+wlr_protocols_dep = dependency('wlr-protocols')
+wlr_protocols_dir = wlr_protocols_dep.get_variable('pkgdatadir')
 
-foreach name, path : protocols
+protocols = [
+    wl_protocols_dir / 'stable/xdg-shell/xdg-shell.xml',
+    wlr_protocols_dir / 'unstable/wlr-layer-shell-unstable-v1.xml',
+]
+
+foreach path : protocols
     private_code = custom_target(
-        name.underscorify() + '_c',
-        input: wayland_protocols_dir / path,
+        path.underscorify() + '_c',
+        input: path,
         output: '@BASENAME@-protocol.c',
         command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
     )
     server_header = custom_target(
-        name.underscorify() + '_server_h',
-        input: wayland_protocols_dir / path,
+        path.underscorify() + '_server_h',
+        input: path,
         output: '@BASENAME@-protocol.h',
         command: [wayland_scanner, 'server-header', '@INPUT@', '@OUTPUT@'],
     )
