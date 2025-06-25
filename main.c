@@ -289,8 +289,8 @@ static void focus_client(struct ws_client *client, bool sure) {
 
 void client_position(struct ws_client *client) {
 	assert(client);
+	assert(s.cur_output);
 
-	// assert(client->output);
 	if (!client->output) {
 		client->output = s.cur_output;
 	}
@@ -323,6 +323,10 @@ void client_position(struct ws_client *client) {
 }
 
 void client_position_all() {
+	if (!s.cur_output) {
+		return;
+	}
+
 	struct ws_client *client;
 	wl_list_for_each (client, &s.clients, link) {
 		client_position(client);
@@ -361,12 +365,12 @@ void keyboard_handle_modifiers(struct wl_listener *listener, void *) {
 static struct ws_client *checkout_client(bool next, bool cur) {
 	struct ws_client *prev_client = s.win_client;
 	struct ws_output *want_output = s.cur_output;
+	struct ws_client *temp_client = NULL;
 
-	if (wl_list_length(&s.clients) < 2) {
-		return false;
+	if (wl_list_empty(&s.clients)) {
+		return NULL;
 	}
 
-	struct ws_client *temp_client = NULL;
 	struct wl_list *client_link =
 		prev_client ? &prev_client->link : s.clients.next;
 
@@ -385,12 +389,8 @@ static struct ws_client *checkout_client(bool next, bool cur) {
 		break;
 	}
 
+	// 至少也会返回起点
 	assert(temp_client);
-
-	if (prev_client == temp_client) {
-		assert(cur);
-		return NULL;
-	}
 
 	return temp_client;
 }
@@ -932,34 +932,26 @@ void handle_output_request_state(struct wl_listener *listener, void *data) {
 // ws_output.destroy (wlr_output->events.destroy)
 void handle_output_destroy(struct wl_listener *listener, void *) {
 	struct ws_output *output = wl_container_of(listener, output, destroy);
-	/* bool was_nested = wlr_output_is_wl(output->wlr_output); */
 
 	wl_list_remove(&output->frame.link);
 	wl_list_remove(&output->request_state.link);
 	wl_list_remove(&output->destroy.link);
 	wl_list_remove(&output->link);
 
-	if (s.cur_output == output) {
-		// TODO
-	}
-
-	struct ws_client *client;
-	wl_list_for_each (client, &s.clients, link) {
-		if (client->output != output) {
-			continue;
-		}
-		// TODO
-	}
-
-	// wlr_scene_output_layout should remove scene_output
-	// automatically
 	wlr_output_layout_remove(s.output_layout, output->wlr_output);
 	free(output);
 
-	// if (wl_list_empty(&server.outputs) && was_nested)
 	if (wl_list_empty(&s.outputs)) {
-		exit(EXIT_SUCCESS);
+		s.cur_output = NULL;
+		return;
 	}
+
+	if (s.cur_output != output) {
+		return;
+	}
+
+	s.cur_output = wl_container_of(s.outputs.next, output, link);
+	client_position_all();
 }
 
 // ws_server.new_output (server.backend->events.new_output)
