@@ -2,40 +2,65 @@
 
 window less, wlroots based wayland compositor.
 
+## Install(WIP)
+
+The officially supported Linux distributions are Alpine Linux and Deepin.
+
 ## Compile
 
-wless has the following dependencies:
-
-- wayland-protocols
-- wlr-protocols
-- wlroots-dev
-
-And it works well with:
-
-- foot
-- wmenu
+```bash
+depends="
+        foot
+        "
+makedepends="
+        libxkbcommon-dev
+        meson
+        wayland-dev
+        wayland-protocols
+        wlr-protocols
+        wlroots-dev
+        "
+```
 
 ## Key bindings
 
-- `Alt + Tab` 切换到下一个窗口，从近到远
-- `Alt + Shfit + Tab` 同上但从远到近
-- `Win + Tab` 切换到当前屏幕的下一个窗口，从近到远
-- `Win + Shfit + Tab` 同上但从远到近
-- `Win + Enter` 启动新终端 foot
-- `Win + w` 关闭窗口
-- `Win + Shift + Esc` 退出
+- <kbd>Super</kbd> + <kbd>Enter</kbd>
+- <kbd>Super</kbd> + <kbd>W</kbd>
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>Esc</kbd>
+- <kbd>Alt</kbd> + <kbd>Tab</kbd>
+- <kbd>Alt</kbd> + <kbd>Shfit</kbd> + <kbd>Tab</kbd>
+- <kbd>Super</kbd> + <kbd>Tab</kbd>
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>Tab</kbd>
 
 ### TODO
 
-- `Win + R` 启动 wmenu-run
-- `Win + Space` wmenu 跳转
-- `Win + [0-9]` 快捷启动或跳转
-- `Win + [Shift] + [N/P]` 屏幕焦点移动
+- <kbd>Super</kbd> + <kbd>R</kbd>
+- <kbd>Super</kbd> + <kbd>Space</kbd>
+- <kbd>Super</kbd> + <kbd>0..9</kbd>
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>0..9</kbd>
+- <kbd>Super</kbd> + <kbd>N</kbd>
+- <kbd>Super</kbd> + <kbd>P</kbd>
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>N</kbd>
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>P</kbd>
 
-## Output
+## Output Mode Settings
 
 - wlr-randr
-
-### TODO
-
 - <https://github.com/emersion/kanshi>
+
+## Acknowledgements
+
+- tinywl(wlroots), cage, dwl
+- @DreamMaoMao
+
+A special thanks to @vaaandark for giving me the monitor
+
+```bash
+$ wlr-randr
+DP-1 "Xiaomi Corporation Mi Monitor (DP-1)"
+  Make: Xiaomi Corporation
+  Model: Mi Monitor
+  Physical size: 800x330 mm
+  Enabled: yes
+```
+
