@@ -50,7 +50,7 @@ static struct ws_config *parse_args(int argc, char *argv[]) {
 			cmd = calloc(1, sizeof(*cmd));
 			cmd->command = optarg;
 			wl_list_insert(config->start_cmds.prev, &cmd->link);
-			wlr_log(WLR_INFO, "startup: %s", optarg);
+			wlr_log(WLR_INFO, "add startup: %s", optarg);
 			break;
 		case 'h':
 			goto print_help;
@@ -106,12 +106,13 @@ static xkb_keysym_t str2keysym(const char *word) {
 
 static void parse_entry(struct ws_config *config, const char *entry,
 			enum ws_config_t type) {
-	char key[16] = {0};
-	char value[64] = {0};
-	if (sscanf(entry, "%15[^=]=%63s", key, value) != 2) {
-		wlr_log_errno(WLR_INFO, "failed to parse %s", entry);
+	const char *const equal = strchr(entry, '=');
+	if (!equal || equal - entry > 15) {
+		wlr_log(WLR_INFO, "failed to parse %s", entry);
 		return;
 	}
+	char key[16] = {0};
+	strncpy(key, entry, equal - entry);
 
 	xkb_keysym_t keysym;
 	struct ws_key_bind *keybind;
@@ -125,13 +126,13 @@ static void parse_entry(struct ws_config *config, const char *entry,
 		// force-exec
 		keybind = wl_array_add(&config->keybinds, sizeof(*keybind));
 		keybind->modifiers = WLR_MODIFIER_LOGO | WLR_MODIFIER_SHIFT;
-		keybind->command = strdup(value);
+		keybind->command = equal + 1;
 		keybind->keysym = keysym;
 		keybind->function = action_exec;
 		// jump-or-exec
 		keybind = wl_array_add(&config->keybinds, sizeof(*keybind));
 		keybind->modifiers = WLR_MODIFIER_LOGO;
-		keybind->command = strdup(value);
+		keybind->command = equal + 1;
 		keybind->keysym = keysym;
 		keybind->function = action_jump;
 		break;
@@ -145,7 +146,7 @@ static void parse_entry(struct ws_config *config, const char *entry,
 		// always-exec
 		keybind = wl_array_add(&config->keybinds, sizeof(*keybind));
 		keybind->modifiers = WLR_MODIFIER_LOGO;
-		keybind->command = strdup(value);
+		keybind->command = equal + 1;
 		keybind->keysym = keysym;
 		keybind->function = action_exec;
 		break;
