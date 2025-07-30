@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -32,28 +33,24 @@
 #include "wless.h"
 
 static struct ws_config *parse_args(int argc, char *argv[]) {
-	wlr_log(WLR_INFO, "[config] parse_args");
-
 	struct ws_config *config = calloc(1, sizeof(*config));
-	if (!config) {
-		wlr_log(WLR_ERROR, "[config] failed to allocate config");
-	}
+	assert(config);
 
 	wl_list_init(&config->start_cmds);
 	struct ws_start_cmd *cmd = NULL;
+	wlr_log_init(WLR_INFO, NULL);
 
 	int c;
 	while ((c = getopt(argc, argv, "ds:hv")) != -1) {
 		switch (c) {
 		case 'd':
-			wlr_log(WLR_INFO, "[config]\t-d");
 			wlr_log_init(WLR_DEBUG, NULL);
 			break;
 		case 's':
-			wlr_log(WLR_INFO, "[config]\t-s: %s", optarg);
 			cmd = calloc(1, sizeof(*cmd));
 			cmd->command = optarg;
 			wl_list_insert(config->start_cmds.prev, &cmd->link);
+			wlr_log(WLR_INFO, "startup: %s", optarg);
 			break;
 		case 'h':
 			goto print_help;
@@ -71,26 +68,23 @@ static struct ws_config *parse_args(int argc, char *argv[]) {
 	return config;
 
 print_help:
-	printf("help\n");
+	printf("TODO: help\n");
 	exit(EXIT_SUCCESS);
 
 print_version:
-	printf("version\n");
+	printf("TODO: version\n");
 	exit(EXIT_SUCCESS);
 
 print_error:
-	printf("help\n");
+	printf("TODO: help\n");
 	exit(EXIT_FAILURE);
 }
 
 static xkb_keysym_t str2keysym(const char *word) {
-	if (!word || strlen(word) == 0) {
-		// TODO wlr_log
-		return XKB_KEY_NoSymbol;
-	}
+	assert(word);
 
 	// some overrides
-#define KEY_LIST                                                               \
+#define KEY_ALIAS_LIST                                                         \
 	X(ENTER, XKB_KEY_Return)                                               \
 	X(ESC, XKB_KEY_Escape)
 
@@ -98,13 +92,14 @@ static xkb_keysym_t str2keysym(const char *word) {
 	if (strcmp(word, #NAME) == 0) {                                        \
 		return XKB_KEY;                                                \
 	}
-	KEY_LIST
+	KEY_ALIAS_LIST
 #undef X
 
+	// use this flag to get lowercase key
 	xkb_keysym_t key =
 		xkb_keysym_from_name(word, XKB_KEYSYM_CASE_INSENSITIVE);
 	if (key == XKB_KEY_NoSymbol) {
-		// TODO wlr_log
+		wlr_log(WLR_INFO, "failed to parse key from %s", word);
 	}
 	return key;
 }
@@ -113,8 +108,8 @@ static void parse_entry(struct ws_config *config, const char *entry,
 			enum ws_config_t type) {
 	char key[16] = {0};
 	char value[64] = {0};
-	if (sscanf(entry, "%15s=%63s", key, value) != 2) {
-		wlr_log(WLR_INFO, "[env] failed to parse %s", entry);
+	if (sscanf(entry, "%15[^=]=%63s", key, value) != 2) {
+		wlr_log_errno(WLR_INFO, "failed to parse %s", entry);
 		return;
 	}
 
@@ -158,22 +153,21 @@ static void parse_entry(struct ws_config *config, const char *entry,
 }
 
 static void parse_envs(struct ws_config *config) {
-
-	const char *env_xrd = getenv("XDG_RUNTIME_DIR");
-	if (!env_xrd) {
-		wlr_log(WLR_ERROR, "[env] XDG_RUNTIME_DIR=NULL");
-		exit(EXIT_FAILURE);
-	} else {
-		wlr_log(WLR_INFO, "[env] XDG_RUNTIME_DIR=%s", env_xrd);
-	}
-
+	const char *xdg_runtime_dir = NULL;
 	wl_array_init(&config->keybinds);
 
 	extern char **environ;
 	for (char **env = environ; *env; env++) {
 		const char *entry = *env;
+		if (strncmp(entry, "XDG_RUNTIME_DIR",
+			    strlen("XDG_RUNTIME_DIR")) == 0) {
+			wlr_log(WLR_INFO, "env: %s", entry);
+			xdg_runtime_dir = entry;
+			continue;
+		}
+
 		if (strncmp(entry, "WLESS_", strlen("WLESS_")) == 0) {
-			wlr_log(WLR_DEBUG, "[env] reading %s", entry);
+			wlr_log(WLR_DEBUG, "env: %s", entry);
 			entry += strlen("WLESS_");
 		} else {
 			continue;
@@ -192,15 +186,20 @@ static void parse_envs(struct ws_config *config) {
 
 		// TODO: other settings
 	}
+
+	// https://github.com/swaywm/sway/issues/7202
+	if (!xdg_runtime_dir) {
+		wlr_log(WLR_ERROR, "XDG_RUNTIME_DIR is not set");
+		exit(EXIT_FAILURE);
+	}
 }
 
 int main(int argc, char *argv[]) {
 	// test
 
 	// init
-	wlr_log_init(WLR_INFO, NULL);
 	struct ws_server s = {.magic = 6};
-	s.config = parse_args(argc, argv);
+	s.config = parse_args(argc, argv); // exit
 	parse_envs(s.config);
 
 	// signal
@@ -212,7 +211,7 @@ int main(int argc, char *argv[]) {
 	// main
 	s.wl_display = wl_display_create();
 	if (!s.wl_display) {
-		wlr_log(WLR_ERROR, "[main] failed to create wl_display");
+		wlr_log(WLR_ERROR, "failed to create wl_display");
 		goto err_wl_display;
 	}
 
@@ -221,24 +220,24 @@ int main(int argc, char *argv[]) {
 
 	s.backend = wlr_backend_autocreate(s.wl_event_loop, &s.session);
 	if (!s.backend) {
-		wlr_log(WLR_ERROR, "[main] failed to create wlr_backend");
+		wlr_log(WLR_ERROR, "failed to create wlr_backend");
 		goto err_backend;
 	}
 
 	s.renderer = wlr_renderer_autocreate(s.backend);
 	if (!s.renderer) {
-		wlr_log(WLR_ERROR, "[main] failed to create wlr_renderer");
+		wlr_log(WLR_ERROR, "failed to create wlr_renderer");
 		goto err_renderer;
 	}
 
 	if (!wlr_renderer_init_wl_display(s.renderer, s.wl_display)) {
-		wlr_log(WLR_ERROR, "[main] failed to init display");
+		wlr_log(WLR_ERROR, "failed to init display");
 		goto err_init_display;
 	}
 
 	s.allocator = wlr_allocator_autocreate(s.backend, s.renderer);
 	if (!s.allocator) {
-		wlr_log(WLR_ERROR, "[main] failed to create wlr_allocator");
+		wlr_log(WLR_ERROR, "failed to create wlr_allocator");
 		goto err_allocator;
 	}
 
@@ -381,6 +380,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	setenv("WAYLAND_DISPLAY", socket, true);
+
+	struct ws_start_cmd *cmd;
+	wl_list_for_each_reverse (cmd, &s.config->start_cmds, link) {
+		action_exec(&s, cmd->command);
+	}
+
 	wl_display_run(s.wl_display);
 
 	exit(EXIT_SUCCESS);

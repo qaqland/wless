@@ -26,8 +26,7 @@ struct ws_start_cmd {
 };
 
 struct ws_config {
-	// enum wlr_log_importance log_level;
-	struct wl_list start_cmds;
+	struct wl_list start_cmds; // wl_list_for_each_reverse
 
 	struct wl_array keybinds;
 };
