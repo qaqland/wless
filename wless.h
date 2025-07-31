@@ -4,7 +4,6 @@
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 #include <wlr/util/log.h>
-#include <wordexp.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "server.h"
@@ -18,24 +17,21 @@ enum ws_config_t {
 };
 
 struct ws_start_cmd {
-	char *command;
-
-	// TODO: pid?
-
+	const char *command; // from argv
 	struct wl_list link;
+	// TODO: pid?
 };
 
 struct ws_config {
 	struct wl_list start_cmds; // wl_list_for_each_reverse
-
 	struct wl_array keybinds;
 };
 
 struct ws_key_bind {
 	uint32_t modifiers;
 	xkb_keysym_t keysym;
-	void (*function)(struct ws_server *, char *);
-	char *command;
+	void (*function)(struct ws_server *, const char *);
+	const char *command; // from env
 };
 
 #endif

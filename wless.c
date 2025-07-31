@@ -107,7 +107,7 @@ static xkb_keysym_t str2keysym(const char *word) {
 static void parse_entry(struct ws_config *config, const char *entry,
 			enum ws_config_t type) {
 	const char *const equal = strchr(entry, '=');
-	if (!equal || equal - entry > 15) {
+	if (!equal || equal - entry > 15 || !*(equal+1)) {
 		wlr_log(WLR_INFO, "failed to parse %s", entry);
 		return;
 	}

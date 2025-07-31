@@ -86,7 +86,7 @@ struct ws_client *checkout_client(struct ws_server *server, bool is_local,
 	return temp_client;
 }
 
-void action_next_window(struct ws_server *server, char *command) {
+void action_next_window(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
@@ -97,7 +97,7 @@ void action_next_window(struct ws_server *server, char *command) {
 	client_raise(client);
 }
 
-void action_prev_window(struct ws_server *server, char *command) {
+void action_prev_window(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
@@ -108,7 +108,7 @@ void action_prev_window(struct ws_server *server, char *command) {
 	client_raise(client);
 }
 
-void action_next_window_local(struct ws_server *server, char *command) {
+void action_next_window_local(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
@@ -119,7 +119,7 @@ void action_next_window_local(struct ws_server *server, char *command) {
 	client_raise(client);
 }
 
-void action_prev_window_local(struct ws_server *server, char *command) {
+void action_prev_window_local(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
@@ -148,26 +148,26 @@ void action_focus_done(struct ws_server *server) {
 }
 
 // TODO
-void action_next_display(struct ws_server *server, char *command) {
+void action_next_display(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 }
 
-void action_prev_display(struct ws_server *server, char *command) {
+void action_prev_display(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 }
 
-void action_move_next(struct ws_server *server, char *command) {
+void action_move_next(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 }
-void action_move_prev(struct ws_server *server, char *command) {
+void action_move_prev(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 }
 
-void action_exec(struct ws_server *server, char *command) {
+void action_exec(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(command);
 
@@ -177,7 +177,7 @@ void action_exec(struct ws_server *server, char *command) {
 	wlr_log(WLR_DEBUG, "[action] exec %s", command);
 }
 
-void action_jump(struct ws_server *server, char *command) {
+void action_jump(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 
 	wlr_log(WLR_DEBUG, "[action] jump %s", command);
@@ -194,7 +194,7 @@ void action_jump(struct ws_server *server, char *command) {
 	// jump the first
 }
 
-void action_close_window(struct ws_server *server, char *command) {
+void action_close_window(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
@@ -224,7 +224,7 @@ void action_close_window(struct ws_server *server, char *command) {
 	// client_focus(next_client);
 }
 
-void action_quit(struct ws_server *server, char *command) {
+void action_quit(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
