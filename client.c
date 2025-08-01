@@ -13,12 +13,22 @@
 #include "server.h"
 
 const char *client_appid(struct ws_client *client) {
+	if (!client) {
+		return "NULL";
+	}
 	const char *appid = client->xdg_toplevel->app_id;
+	// TODO
+	// what case NULL?
 	return appid ? appid : "empty_id";
 }
 
 const char *client_title(struct ws_client *client) {
+	if (!client) {
+		return "NULL";
+	}
 	const char *title = client->xdg_toplevel->title;
+	// TODO
+	// what case NULL?
 	return title ? title : "empty_title";
 }
 
@@ -30,8 +40,16 @@ struct ws_client *client_now(struct ws_server *server) {
 	}
 	struct ws_client *client =
 		wl_container_of(server->clients.next, client, link);
-	// assert(client->output->cur_client == client);
 	return client;
+	{
+		// TODO
+		// when we have multi-output, the focusd-output may have no
+		// client. clients[0] are put on other output
+		struct ws_output *output = output_now(server);
+		struct ws_client *client = output_client(output);
+		wlr_log(WLR_DEBUG, "client now is %s", client_title(client));
+		return client;
+	}
 }
 
 static struct wlr_surface *client_surface(struct ws_client *client) {
@@ -102,6 +120,20 @@ void client_raise(struct ws_client *client) {
 
 	wlr_scene_node_raise_to_top(&client->scene_tree->node);
 }
+
+void client_unfocus(struct ws_client *client) {
+	if (!client) {
+		return;
+	}
+	assert(client->server->magic == 6);
+	wlr_log(WLR_INFO, "[client] unfocus >>> %s: %p", client_title(client),
+		(void *) client);
+	wlr_xdg_toplevel_set_activated(client->xdg_toplevel, false);
+}
+
+// TODO
+// unfocus/focuse 这里也许可以和鼠标、键盘等触发放在一起
+// 或者 seat 那边的事件来自动做，避免手动调用
 
 void client_focus(struct ws_client *new_client) {
 	assert(new_client);
