@@ -141,7 +141,7 @@ void action_focus_done(struct ws_server *server) {
 	if (!client) {
 		return;
 	}
-	if (client == client_now(server)) {
+	if (client == client_zero(server)) {
 		return;
 	}
 	client_focus(client);
@@ -205,7 +205,7 @@ void action_close_window(struct ws_server *server, const char *command) {
 	}
 
 	struct ws_output *output = output_now(server);
-	struct ws_client *client = client_now(server);
+	struct ws_client *client = client_zero(server);
 
 	if (client_output(client) != output) {
 		return;

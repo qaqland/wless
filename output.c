@@ -13,10 +13,15 @@
 #include "server.h"
 
 const char *output_name(struct ws_output *output) {
+	if (!output) {
+		return "NULL";
+	}
 	const char *name = output->wlr_output->name;
-	return name;
+	return name ? name : "EMPTY";
 }
 
+// Unlike the client, output_zero and output_now are equivalent and can obtain
+// the current focused output.
 struct ws_output *output_now(struct ws_server *server) {
 	assert(server->magic == 6);
 

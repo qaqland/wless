@@ -18,6 +18,9 @@ struct ws_client {
 	struct wl_listener commit;
 	struct wl_listener destroy;
 	struct wl_listener request_fullscreen;
+
+	char *lowercase_app_id; // jump-or-exec
+	struct wl_listener set_app_id;
 };
 
 struct ws_client_popup {
@@ -38,6 +41,7 @@ struct ws_output *client_output(struct ws_client *client);
 void client_raise(struct ws_client *client);
 void client_focus(struct ws_client *client);
 
+struct ws_client *client_zero(struct ws_server *server);
 struct ws_client *client_now(struct ws_server *server);
 
 void client_position(struct ws_client *client, struct ws_output *output);

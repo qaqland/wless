@@ -50,7 +50,7 @@ static struct ws_config *parse_args(int argc, char *argv[]) {
 			cmd = calloc(1, sizeof(*cmd));
 			cmd->command = optarg;
 			wl_list_insert(config->start_cmds.prev, &cmd->link);
-			wlr_log(WLR_INFO, "add startup: %s", optarg);
+			wlr_log(WLR_INFO, "startup command: %s", optarg);
 			break;
 		case 'h':
 			goto print_help;
@@ -107,7 +107,7 @@ static xkb_keysym_t str2keysym(const char *word) {
 static void parse_entry(struct ws_config *config, const char *entry,
 			enum ws_config_t type) {
 	const char *const equal = strchr(entry, '=');
-	if (!equal || equal - entry > 15 || !*(equal+1)) {
+	if (!equal || equal - entry > 15 || !*(equal + 1)) {
 		wlr_log(WLR_INFO, "failed to parse %s", entry);
 		return;
 	}
@@ -168,7 +168,7 @@ static void parse_envs(struct ws_config *config) {
 		}
 
 		if (strncmp(entry, "WLESS_", strlen("WLESS_")) == 0) {
-			wlr_log(WLR_DEBUG, "env: %s", entry);
+			wlr_log(WLR_INFO, "env: %s", entry);
 			entry += strlen("WLESS_");
 		} else {
 			continue;

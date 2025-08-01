@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <wayland-util.h>
 #include <wlr/types/wlr_output_layout.h>
@@ -12,14 +13,12 @@
 #include "output.h"
 #include "server.h"
 
-const char *client_appid(struct ws_client *client) {
+const char *client_app_id(struct ws_client *client) {
 	if (!client) {
 		return "NULL";
 	}
-	const char *appid = client->xdg_toplevel->app_id;
-	// TODO
-	// what case NULL?
-	return appid ? appid : "empty_id";
+	const char *app_id = client->xdg_toplevel->app_id;
+	return app_id ? app_id : "EMPTY";
 }
 
 const char *client_title(struct ws_client *client) {
@@ -27,12 +26,10 @@ const char *client_title(struct ws_client *client) {
 		return "NULL";
 	}
 	const char *title = client->xdg_toplevel->title;
-	// TODO
-	// what case NULL?
-	return title ? title : "empty_title";
+	return title ? title : "EMPTY";
 }
 
-struct ws_client *client_now(struct ws_server *server) {
+struct ws_client *client_zero(struct ws_server *server) {
 	assert(server->magic == 6);
 
 	if (wl_list_empty(&server->clients)) {
@@ -41,15 +38,21 @@ struct ws_client *client_now(struct ws_server *server) {
 	struct ws_client *client =
 		wl_container_of(server->clients.next, client, link);
 	return client;
-	{
-		// TODO
-		// when we have multi-output, the focusd-output may have no
-		// client. clients[0] are put on other output
-		struct ws_output *output = output_now(server);
-		struct ws_client *client = output_client(output);
-		wlr_log(WLR_DEBUG, "client now is %s", client_title(client));
-		return client;
+}
+
+// When we have multiple outputs, server->clients.next might be located on other
+// output. Therefore, we define client_zero and client_now to distinguish
+// between them.
+struct ws_client *client_now(struct ws_server *server) {
+	assert(server->magic == 6);
+
+	struct ws_client *client = NULL;
+	struct ws_output *output = output_now(server);
+	if (output) {
+	client = output_client(output);
 	}
+	wlr_log(WLR_DEBUG, "client now is %s", client_title(client));
+	return client;
 }
 
 static struct wlr_surface *client_surface(struct ws_client *client) {
@@ -293,7 +296,7 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	// action_focus_done vs client_focus
 	// action_focus_done(server);
 
-	struct ws_client *next_client = client_now(server);
+	struct ws_client *next_client = client_zero(server);
 	if (!next_client) {
 		return;
 	}
@@ -330,6 +333,22 @@ void xdg_toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
 		client->xdg_toplevel->requested.fullscreen);
 }
 
+void xdg_toplevel_set_app_id(struct wl_listener *listener, void *data) {
+	struct ws_client *client =
+		wl_container_of(listener, client, set_app_id);
+	assert(!data);
+	assert(client->server->magic == 6);
+
+	const char *app_id = client->xdg_toplevel->app_id;
+	if (!app_id) {
+		return;
+	}
+	client->lowercase_app_id = calloc(1, strlen(app_id) + 1);
+	for (int i = 0; app_id[i]; i++) {
+		client->lowercase_app_id[i] = tolower(app_id[i]);
+	}
+}
+
 void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	struct ws_client *client = wl_container_of(listener, client, destroy);
 	assert(!data);
@@ -340,8 +359,9 @@ void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	wl_list_remove(&client->map.link);
 	wl_list_remove(&client->unmap.link);
 	wl_list_remove(&client->commit.link);
-	wl_list_remove(&client->destroy.link);
 	wl_list_remove(&client->request_fullscreen.link);
+	wl_list_remove(&client->set_app_id.link);
+	wl_list_remove(&client->destroy.link);
 
 	free(client);
 }
@@ -376,17 +396,22 @@ void handle_new_xdg_toplevel(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_toplevel->base->surface->events.commit,
 		      &client->commit);
 
-	// emit: destroy_xdg_toplevel()
-	// data: NULL
-	client->destroy.notify = xdg_toplevel_destroy;
-	wl_signal_add(&xdg_toplevel->events.destroy, &client->destroy);
-
 	// emit: xdg_toplevel_handle_set_fullscreen()
 	// emit: xdg_toplevel_handle_unset_fullscreen()
 	// data: NULL
 	client->request_fullscreen.notify = xdg_toplevel_request_fullscreen;
 	wl_signal_add(&xdg_toplevel->events.request_fullscreen,
 		      &client->request_fullscreen);
+
+	// emit: xdg_toplevel_handle_set_app_id()
+	// data: NULL
+	client->set_app_id.notify = xdg_toplevel_set_app_id;
+	wl_signal_add(&xdg_toplevel->events.set_app_id, &client->set_app_id);
+
+	// emit: destroy_xdg_toplevel()
+	// data: NULL
+	client->destroy.notify = xdg_toplevel_destroy;
+	wl_signal_add(&xdg_toplevel->events.destroy, &client->destroy);
 }
 
 void xdg_popup_commit(struct wl_listener *listener, void *data) {
