@@ -53,6 +53,33 @@ struct ws_client *output_client(struct ws_output *output) {
 	return client_at(output->server, center_x, center_y, NULL, NULL, NULL);
 }
 
+void output_position(struct ws_server *server) {
+	assert(server->magic == 6);
+
+	if (wl_list_empty(&server->outputs)) {
+		return;
+	}
+	// FIXME
+	// why kanshi trigged this function run three times?
+
+	// update output geometry: output->output_box
+	struct ws_output *output;
+	wl_list_for_each (output, &server->outputs, link) {
+		struct wlr_box *layout_box = &output->output_box;
+		wlr_output_layout_get_box(server->output_layout,
+					  output->wlr_output, layout_box);
+		wlr_log(WLR_INFO, "output %s: (%4d, %4d, %4d, %4d)",
+			output_name(output), layout_box->x, layout_box->y,
+			layout_box->width, layout_box->height);
+	}
+
+	// it is output_destory's duty to move client
+	struct ws_client *client;
+	wl_list_for_each (client, &server->clients, link) {
+		client_position(client, NULL);
+	}
+}
+
 static void update_output_manager_config(struct ws_server *server) {
 	assert(server->magic == 6);
 
@@ -80,7 +107,7 @@ void handle_output_layout_change(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, output_layout_change);
 	assert(server->output_layout == data);
 
-	client_position_all(server);
+	output_position(server);
 	update_output_manager_config(server);
 }
 
@@ -296,5 +323,5 @@ void handle_output_manager_apply(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, output_manager_apply);
 	struct wlr_output_configuration_v1 *config = data;
 	output_manager_apply_config(config, false);
-	client_position_all(server);
+	output_position(server);
 }

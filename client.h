@@ -45,7 +45,6 @@ struct ws_client *client_zero(struct ws_server *server);
 struct ws_client *client_now(struct ws_server *server);
 
 void client_position(struct ws_client *client, struct ws_output *output);
-void client_position_all(struct ws_server *server);
 
 void handle_new_xdg_toplevel(struct wl_listener *, void *data);
 void handle_new_xdg_popup(struct wl_listener *, void *data);

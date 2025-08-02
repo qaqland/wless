@@ -133,11 +133,7 @@ void action_prev_window_local(struct ws_server *server, const char *command) {
 void action_focus_done(struct ws_server *server) {
 	assert(server->magic == 6);
 
-	struct ws_output *output = output_now(server);
-	if (!output) {
-		return;
-	}
-	struct ws_client *client = output_client(output);
+	struct ws_client *client = client_now(server);
 	if (!client) {
 		return;
 	}

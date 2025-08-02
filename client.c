@@ -37,6 +37,7 @@ struct ws_client *client_zero(struct ws_server *server) {
 	}
 	struct ws_client *client =
 		wl_container_of(server->clients.next, client, link);
+	wlr_log(WLR_DEBUG, "client_zero: %s", client_title(client));
 	return client;
 }
 
@@ -49,9 +50,9 @@ struct ws_client *client_now(struct ws_server *server) {
 	struct ws_client *client = NULL;
 	struct ws_output *output = output_now(server);
 	if (output) {
-	client = output_client(output);
+		client = output_client(output);
 	}
-	wlr_log(WLR_DEBUG, "client now is %s", client_title(client));
+	wlr_log(WLR_DEBUG, "client_now: %s", client_title(client));
 	return client;
 }
 
@@ -101,19 +102,31 @@ struct ws_output *client_output(struct ws_client *client) {
 	struct ws_server *server = client->server;
 	assert(server->magic == 6);
 
-	struct wlr_box *client_box = &client->xdg_toplevel->base->geometry;
-	wlr_log(WLR_INFO, "[client] %s >>> x:%d, y: %d, w: %d, h: %d",
-		client_title(client), client_box->x, client_box->y,
-		client_box->width, client_box->height);
+	// most time we have only one output
+	if (server->outputs.next == server->outputs.prev) {
+		struct ws_output *output; // fake
+		return wl_container_of(server->outputs.next, output, link);
+	}
 
-	struct wlr_output *wlr_output = wlr_output_layout_output_at(
-		client->server->output_layout, client_box->x, client_box->y);
-	if (!wlr_output) {
+	if (wl_list_empty(&server->outputs)) {
+		return NULL;
+	}
+
+	// If the client_position is triggerd when output_layout_change, then
+	// the judgment based on coordinates will not be very accurate.
+	// Therefore, we use the scene-based API for update.
+
+	struct wl_list *outputs =
+		&client->xdg_toplevel->base->surface->current_outputs;
+
+	if (wl_list_empty(outputs)) {
 		wlr_log(WLR_ERROR, "failed to get client's output");
 		return NULL;
 	}
 
-	return wlr_output->data;
+	struct wlr_surface_output *surface_output =
+		wl_container_of(outputs->next, surface_output, link);
+	return surface_output->output->data;
 }
 
 void client_raise(struct ws_client *client) {
@@ -124,12 +137,13 @@ void client_raise(struct ws_client *client) {
 	wlr_scene_node_raise_to_top(&client->scene_tree->node);
 }
 
-void client_unfocus(struct ws_client *client) {
-	if (!client) {
-		return;
-	}
+void client_blur(struct ws_client *client) {
+	assert(client);
 	assert(client->server->magic == 6);
-	wlr_log(WLR_INFO, "[client] unfocus >>> %s: %p", client_title(client),
+	// TODO there should be only one case: blur client_zero
+	// assert(client == client_zero(client->server));
+
+	wlr_log(WLR_INFO, "client_blur: %s (%p)", client_title(client),
 		(void *) client);
 	wlr_xdg_toplevel_set_activated(client->xdg_toplevel, false);
 }
@@ -145,6 +159,8 @@ void client_focus(struct ws_client *new_client) {
 
 	struct wlr_surface *new_surface = client_surface(new_client);
 
+	// TODO why don't we directly set it as client_zero
+	// TODO test it on tinywl
 	struct wlr_surface *old_surface =
 		server->seat->keyboard_state.focused_surface;
 
@@ -186,7 +202,7 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 	struct ws_server *server = client->server;
 	assert(server->magic == 6);
 
-	wlr_log(WLR_INFO, "[client] position");
+	wlr_log(WLR_INFO, "client_position");
 
 	struct wlr_box *client_box = &client->xdg_toplevel->base->geometry;
 	wlr_log(WLR_INFO, "[client] %s >>> x:%d, y: %d, w: %d, h: %d",
@@ -196,18 +212,20 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 	output = output ? output : client_output(client);
 	struct wlr_box output_box = output->output_box;
 
-	wlr_log(WLR_INFO, "[output] %s >>> x: %d, y: %d, w: %d, h: %d",
-		output_name(output), output_box.x, output_box.y,
-		output_box.width, output_box.height);
+	{
+		struct wlr_box layout_box = {0};
+		wlr_output_layout_get_box(server->output_layout,
+					  output->wlr_output, &layout_box);
 
-	struct wlr_box layout_box = {0};
-	wlr_output_layout_get_box(server->output_layout, output->wlr_output,
-				  &layout_box);
+		wlr_log(WLR_INFO, "[output] %s >>> x: %d, y: %d, w: %d, h: %d",
+			output_name(output), layout_box.x, output_box.y,
+			layout_box.width, output_box.height);
 
-	assert(output_box.x == layout_box.x);
-	assert(output_box.y == layout_box.y);
-	assert(output_box.width == layout_box.width);
-	assert(output_box.height == layout_box.height);
+		assert(output_box.x == layout_box.x);
+		assert(output_box.y == layout_box.y);
+		assert(output_box.width == layout_box.width);
+		assert(output_box.height == layout_box.height);
+	}
 
 	int new_x = output_box.x;
 	int new_y = output_box.y;
@@ -226,35 +244,6 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 		new_y = output_box.y;
 	}
 	wlr_scene_node_set_position(&client->scene_tree->node, new_x, new_y);
-}
-
-void client_position_all(struct ws_server *server) {
-	assert(server->magic == 6);
-
-	struct ws_output *cur_output = output_now(server);
-	if (!cur_output) {
-		return;
-	}
-
-	wlr_log(WLR_INFO, "[layout] current_output %s",
-		output_name(cur_output));
-
-	// update output geometry here
-	struct ws_output *output;
-	wl_list_for_each (output, &server->outputs, link) {
-		struct wlr_box *layout_box = &output->output_box;
-		wlr_output_layout_get_box(server->output_layout,
-					  output->wlr_output, layout_box);
-		wlr_log(WLR_INFO, "[output] %s >>> x: %d, y: %d, w: %d, h: %d",
-			output_name(output), layout_box->x, layout_box->y,
-			layout_box->width, layout_box->height);
-	}
-
-	// it is output_destory's duty to move client
-	struct ws_client *client;
-	wl_list_for_each (client, &server->clients, link) {
-		client_position(client, NULL);
-	}
 }
 
 void xdg_toplevel_map(struct wl_listener *listener, void *data) {

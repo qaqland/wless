@@ -3,3 +3,5 @@ builddir
 core
 log
 tags
+doc/
+*.swp

@@ -21,6 +21,7 @@ const char *output_name(struct ws_output *output);
 struct ws_client *output_client(struct ws_output *output);
 struct ws_output *output_now(struct ws_server *server);
 void output_focus(struct ws_output *output);
+void output_position(struct ws_server *server);
 
 void handle_new_output(struct wl_listener *listener, void *data);
 
