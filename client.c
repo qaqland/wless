@@ -210,6 +210,8 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 		client_box->width, client_box->height);
 
 	output = output ? output : client_output(client);
+	output = output ? output : output_now(server);
+
 	struct wlr_box output_box = output->output_box;
 
 	{

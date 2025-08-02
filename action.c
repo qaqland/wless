@@ -200,10 +200,8 @@ void action_close_window(struct ws_server *server, const char *command) {
 		return;
 	}
 
-	struct ws_output *output = output_now(server);
 	struct ws_client *client = client_zero(server);
-
-	if (client_output(client) != output) {
+	if (client_now(server) != client) {
 		return;
 	}
 
