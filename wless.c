@@ -29,7 +29,6 @@
 #include "client.h"
 #include "input.h"
 #include "output.h"
-#include "server.h"
 #include "wless.h"
 
 static struct ws_config *parse_args(int argc, char *argv[]) {
@@ -247,8 +246,8 @@ int main(int argc, char *argv[]) {
 	wlr_subcompositor_create(s.wl_display);
 	wlr_data_device_manager_create(s.wl_display);
 
-	// output
 	wl_list_init(&s.outputs);
+	wl_list_init(&s.clients);
 
 	// emit: new_output_reemit()
 	// data: struct wlr_output *
@@ -272,7 +271,8 @@ int main(int argc, char *argv[]) {
 	wlr_viewporter_create(s.wl_display);
 	wlr_presentation_create(s.wl_display, s.backend, 2);
 
-	// wlr-randr
+	// e.g. wlr-randr, kanshi
+	// auto: manager_handle_display_destroy()
 	s.output_manager_v1 = wlr_output_manager_v1_create(s.wl_display);
 
 	// emit: config_handle_apply()
@@ -287,9 +287,6 @@ int main(int argc, char *argv[]) {
 	wl_signal_add(&s.output_manager_v1->events.test,
 		      &s.output_manager_test);
 
-	// client
-	wl_list_init(&s.clients);
-
 	// TODO: check XDG_TOPLEVEL_WM_CAPABILITIES_SINCE_VERSION
 	s.xdg_shell = wlr_xdg_shell_create(s.wl_display, 3);
 
@@ -299,7 +296,7 @@ int main(int argc, char *argv[]) {
 	wl_signal_add(&s.xdg_shell->events.new_toplevel, &s.new_xdg_toplevel);
 
 	// emit: create_xdg_popup()
-	// data: struct wlr_xdg_popup*
+	// data: struct wlr_xdg_popup *
 	s.new_xdg_popup.notify = handle_new_xdg_popup;
 	wl_signal_add(&s.xdg_shell->events.new_popup, &s.new_xdg_popup);
 
@@ -371,12 +368,12 @@ int main(int argc, char *argv[]) {
 
 	const char *socket = wl_display_add_socket_auto(s.wl_display);
 	if (!socket) {
-		wlr_log(WLR_ERROR, "[main] failed to add wl_display socket");
+		wlr_log(WLR_ERROR, "failed to add wl_display socket");
 		goto err_add_socket;
 	}
 
 	if (!wlr_backend_start(s.backend)) {
-		wlr_log(WLR_ERROR, "[main] failed to start wlr_backend");
+		wlr_log(WLR_ERROR, "failed to start wlr_backend");
 		goto err_start_backend;
 	}
 

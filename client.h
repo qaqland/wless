@@ -4,7 +4,7 @@
 #include <wayland-server-core.h>
 
 #include "output.h"
-#include "server.h"
+#include "wless.h"
 
 struct ws_client {
 	struct ws_server *server;

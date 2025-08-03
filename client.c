@@ -11,7 +11,7 @@
 #include "action.h"
 #include "client.h"
 #include "output.h"
-#include "server.h"
+#include "wless.h"
 
 const char *client_app_id(struct ws_client *client) {
 	if (!client) {
@@ -41,8 +41,8 @@ struct ws_client *client_zero(struct ws_server *server) {
 	return client;
 }
 
-// When we have multiple outputs, server->clients.next might be located on other
-// output. Therefore, we define client_zero and client_now to distinguish
+// when we have multiple outputs, server->clients.next might be located on other
+// output. therefore, we define client_zero and client_now to distinguish
 // between them.
 struct ws_client *client_now(struct ws_server *server) {
 	assert(server->magic == 6);
@@ -112,20 +112,27 @@ struct ws_output *client_output(struct ws_client *client) {
 		return NULL;
 	}
 
-	// If the client_position is triggerd when output_layout_change, then
-	// the judgment based on coordinates will not be very accurate.
-	// Therefore, we use the scene-based API for update.
+	// if client_position is triggered during an output_layout_change, then
+	// coordinate-based judgment will not be very accurate. therefore, we
+	// use the scene-based API for updates.
 
-	struct wl_list *outputs =
+	// current_output is inserted via wlr_surface_send_enter() and removed
+	// via wlr_surface_send_leave(). relevant event handlers are registered
+	// with wlr_scene_surface_create() function, which is triggered by:
+	// 	- wlr_scene_node_set_enabled()
+	// 	- wlr_scene_node_set_position()
+	// 	- wlr_scene_node_raise_to_top()
+
+	struct wl_list *surface_outputs =
 		&client->xdg_toplevel->base->surface->current_outputs;
 
-	if (wl_list_empty(outputs)) {
+	if (wl_list_empty(surface_outputs)) {
 		wlr_log(WLR_ERROR, "failed to get client's output");
 		return NULL;
 	}
 
 	struct wlr_surface_output *surface_output =
-		wl_container_of(outputs->next, surface_output, link);
+		wl_container_of(surface_outputs->next, surface_output, link);
 	return surface_output->output->data;
 }
 
@@ -209,8 +216,18 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 		client_title(client), client_box->x, client_box->y,
 		client_box->width, client_box->height);
 
-	output = output ? output : client_output(client);
-	output = output ? output : output_now(server);
+	if (!output) {
+		output = client_output(client);
+	}
+	if (!output) {
+		// FIXME abort()
+		output = output_now(server);
+	}
+	if (!output) {
+		// FIXME abort()
+		wlr_log(WLR_INFO, "client_position noop");
+		return;
+	}
 
 	struct wlr_box output_box = output->output_box;
 

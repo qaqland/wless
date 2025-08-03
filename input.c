@@ -11,7 +11,7 @@
 #include "client.h"
 #include "input.h"
 // #include "output.h"
-#include "server.h"
+#include "wless.h"
 
 struct ws_client *client_at(struct ws_server *server, double lx, double ly,
 			    struct wlr_surface **out_surface, double *sx,

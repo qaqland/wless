@@ -5,7 +5,6 @@
 #include <wlr/types/wlr_keyboard.h>
 #include <xkbcommon/xkbcommon.h>
 
-#include "server.h"
 #include "wless.h"
 
 struct ws_client *checkout_client(struct ws_server *server, bool is_local,
