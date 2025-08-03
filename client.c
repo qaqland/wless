@@ -219,15 +219,7 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 	if (!output) {
 		output = client_output(client);
 	}
-	if (!output) {
-		// FIXME abort()
-		output = output_now(server);
-	}
-	if (!output) {
-		// FIXME abort()
-		wlr_log(WLR_INFO, "client_position noop");
-		return;
-	}
+	assert(output->server->magic == 6);
 
 	struct wlr_box output_box = output->output_box;
 
