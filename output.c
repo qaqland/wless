@@ -20,20 +20,19 @@ const char *output_name(struct ws_output *output) {
 	return name ? name : "EMPTY";
 }
 
-struct ws_output *output_only(struct ws_server *server) {
+struct ws_output *output_only(void *update) {
 	// most time we have only one output
 	static struct ws_output *only = NULL;
-	if (!server) {
+	if (!update) {
 		return only;
 	}
 
 	// pass server to update
+	struct ws_server *server = update;
 	assert(server->magic == 6);
-	if (server->outputs.next == server->outputs.prev) {
-		only = wl_container_of(server->outputs.next, only, link);
-	} else {
-		only = NULL;
-	}
+	only = (server->outputs.next == server->outputs.prev)
+		       ? wl_container_of(server->outputs.next, only, link)
+		       : NULL;
 
 	return only;
 }
