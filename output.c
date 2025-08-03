@@ -20,18 +20,40 @@ const char *output_name(struct ws_output *output) {
 	return name ? name : "EMPTY";
 }
 
+struct ws_output *output_only(struct ws_server *server) {
+	// most time we have only one output
+	static struct ws_output *only = NULL;
+	if (!server) {
+		return only;
+	}
+
+	// pass server to update
+	assert(server->magic == 6);
+	if (server->outputs.next == server->outputs.prev) {
+		only = wl_container_of(server->outputs.next, only, link);
+	} else {
+		only = NULL;
+	}
+
+	return only;
+}
+
 // unlike client, output_zero and output_now are equivalent, both can obtain the
 // current focused output.
 struct ws_output *output_now(struct ws_server *server) {
 	assert(server->magic == 6);
+
+	struct ws_output *output = output_only(NULL);
+	if (output) {
+		return output;
+	}
 
 	if (wl_list_empty(&server->outputs)) {
 		wlr_log(WLR_INFO, "the outputs is empty");
 		return NULL;
 	}
 
-	struct ws_output *output =
-		wl_container_of(server->outputs.next, output, link);
+	output = wl_container_of(server->outputs.next, output, link);
 	return output;
 }
 
@@ -65,7 +87,6 @@ void output_position(struct ws_server *server) {
 	// why kanshi trigged this function run three times?
 
 	// update output geometry: output->output_box
-	int count = 0;
 	struct ws_output *output;
 	wl_list_for_each (output, &server->outputs, link) {
 		struct wlr_box *layout_box = &output->output_box;
@@ -75,13 +96,13 @@ void output_position(struct ws_server *server) {
 			output_name(output), (void *) output->wlr_output,
 			layout_box->x, layout_box->y, layout_box->width,
 			layout_box->height);
-		count++;
 	}
 
 	// if only one output, we can appoint it
-	struct ws_output *selected_output =
-		count == 1 ? output_now(server) : NULL;
-	assert(selected_output->server->magic == 6);
+	struct ws_output *selected_output = output_only(NULL);
+	if (selected_output) {
+		assert(selected_output->server->magic == 6);
+	}
 
 	// it's the duty of the output_destory to move the on-output client.
 	struct ws_client *client;
@@ -120,6 +141,7 @@ void handle_output_layout_change(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, output_layout_change);
 	assert(server->output_layout == data);
 
+	output_only(server);
 	output_position(server);
 	output_manager_update_config(server);
 }

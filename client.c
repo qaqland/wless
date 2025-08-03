@@ -102,10 +102,9 @@ struct ws_output *client_output(struct ws_client *client) {
 	struct ws_server *server = client->server;
 	assert(server->magic == 6);
 
-	// most time we have only one output
-	if (server->outputs.next == server->outputs.prev) {
-		struct ws_output *output; // fake
-		return wl_container_of(server->outputs.next, output, link);
+	struct ws_output *output = output_only(NULL);
+	if (output) {
+		return output;
 	}
 
 	if (wl_list_empty(&server->outputs)) {
