@@ -62,20 +62,21 @@ static struct ws_client *checkout_client(struct ws_server *server,
 	struct ws_client *src_client = client_now(server);
 	struct ws_client *des_client = NULL;
 
+	struct wl_list *link = NULL;
+
 	struct ws_output *only_output = output_only(NULL);
 	if (!src_client) {
 		if (only_output || local_check) {
 			return NULL;
 		}
-		src_client = client_zero(server);
-		assert(src_client);
+		link = &server->clients;
+	} else {
+		link = &src_client->link;
 	}
 
 	// it makes no sense when there is only one output
 	local_check = only_output ? false : local_check;
-
 	struct ws_output *output = output_now(server);
-	struct wl_list *link = &src_client->link;
 
 	for (;;) {
 		link = want_next ? link->next : link->prev;
