@@ -7,9 +7,6 @@
 
 #include "wless.h"
 
-struct ws_client *checkout_client(struct ws_server *server, bool is_local,
-				  bool is_next);
-
 // switch window
 void action_next_window(struct ws_server *server, const char *command);
 void action_prev_window(struct ws_server *server, const char *command);

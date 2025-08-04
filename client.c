@@ -136,7 +136,9 @@ struct ws_output *client_output(struct ws_client *client) {
 }
 
 void client_raise(struct ws_client *client) {
-	assert(client);
+	if (!client) {
+		return;
+	}
 	assert(client->scene_tree);
 	assert(client->server->magic == 6);
 

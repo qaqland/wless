@@ -15,13 +15,7 @@ if get_option('buildtype').startswith('debug')
     add_project_arguments('-DDEBUG', language: 'c')
 endif
 
-sources = files(
-    'action.c',
-    'client.c',
-    'input.c',
-    'output.c',
-    'wless.c',
-)
+sources = files('action.c', 'client.c', 'input.c', 'output.c', 'wless.c')
 
 subdir('protocol')
 

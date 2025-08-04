@@ -42,47 +42,62 @@ static bool change_vt(struct ws_server *server, uint32_t modifiers,
 	return true;
 }
 
-struct ws_client *checkout_client(struct ws_server *server, bool is_local,
-				  bool is_next) {
+static struct ws_client *checkout_client(struct ws_server *server,
+					 bool local_check, bool want_next) {
 	assert(server->magic == 6);
 
 	if (wl_list_empty(&server->clients)) {
 		return NULL;
 	}
 
-	struct ws_output *last_output = output_now(server);
-	struct ws_client *last_client = output_client(last_output);
-	struct ws_client *temp_client = NULL;
-	struct wl_list *client_link = server->clients.next;
+	//	single	multiple
+	// Alt	1	2
+	// Win	3	4
+	//
+	// 1: now > next > ok
+	// 2: now > zero > next > ok
+	// 3: now > next > ok
+	// 4: now > next > check > ok
 
-	if (last_client) {
-		client_link = &last_client->link;
-	} else if (is_local) {
-		return NULL;
+	struct ws_client *src_client = client_now(server);
+	struct ws_client *des_client = NULL;
+
+	struct ws_output *only_output = output_only(NULL);
+	if (!src_client) {
+		if (only_output || local_check) {
+			return NULL;
+		}
+		src_client = client_zero(server);
+		assert(src_client);
 	}
+
+	// it makes no sense when there is only one output
+	local_check = only_output ? false : local_check;
+
+	struct ws_output *output = output_now(server);
+	struct wl_list *link = &src_client->link;
 
 	for (;;) {
-		// usually we want "is_next"
-		client_link = is_next ? client_link->next : client_link->prev;
-		if (client_link == &server->clients) {
+		link = want_next ? link->next : link->prev;
+		if (link == &server->clients) {
 			continue;
 		}
-		// safe to offset
-		temp_client = wl_container_of(client_link, temp_client, link);
+		des_client = wl_container_of(link, des_client, link);
+		assert(des_client->server->magic == 6);
 
-		if (!is_local) {
+		if (!local_check) {
 			break;
 		}
-
-		// local now
-		// at least it would return from its start
-		if (client_output(temp_client) == last_output) {
+		if (client_output(des_client) == output) {
 			break;
 		}
 	}
 
-	assert(temp_client);
-	return temp_client;
+	if (des_client == src_client) {
+		return NULL;
+	} else {
+		return des_client;
+	}
 }
 
 void action_next_window(struct ws_server *server, const char *command) {
@@ -90,9 +105,6 @@ void action_next_window(struct ws_server *server, const char *command) {
 	assert(!command);
 
 	struct ws_client *client = checkout_client(server, false, true);
-	if (!client) {
-		return;
-	}
 	client_raise(client);
 }
 
@@ -101,9 +113,6 @@ void action_prev_window(struct ws_server *server, const char *command) {
 	assert(!command);
 
 	struct ws_client *client = checkout_client(server, false, false);
-	if (!client) {
-		return;
-	}
 	client_raise(client);
 }
 
@@ -112,9 +121,6 @@ void action_next_window_local(struct ws_server *server, const char *command) {
 	assert(!command);
 
 	struct ws_client *client = checkout_client(server, true, true);
-	if (!client) {
-		return;
-	}
 	client_raise(client);
 }
 
@@ -123,9 +129,6 @@ void action_prev_window_local(struct ws_server *server, const char *command) {
 	assert(!command);
 
 	struct ws_client *client = checkout_client(server, true, false);
-	if (!client) {
-		return;
-	}
 	client_raise(client);
 }
 
