@@ -4,4 +4,5 @@ core
 log
 tags
 doc/
+tests/*.out
 *.swp

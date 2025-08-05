@@ -11,6 +11,7 @@
 #include "client.h"
 #include "input.h"
 // #include "output.h"
+#include "output.h"
 #include "wless.h"
 
 struct ws_client *client_at(struct ws_server *server, double lx, double ly,
@@ -71,6 +72,13 @@ static void process_cursor_motion(struct ws_server *server, uint32_t time) {
 	struct ws_client *client =
 		client_at(server, server->cursor->x, server->cursor->y,
 			  &surface, &sx, &sy);
+
+	// output should always valid
+	// TODO if we should check NULL
+	struct ws_output *output =
+		output_at(server, server->cursor->x, server->cursor->y);
+	output_focus(output);
+
 	if (client) {
 		client_focus(client);
 	} else {

@@ -57,6 +57,7 @@ struct ws_output *output_now(struct ws_server *server) {
 }
 
 void output_focus(struct ws_output *output) {
+	// TODO if we should check NULL
 	assert(output);
 	struct ws_server *server = output->server;
 	assert(server->magic == 6);
@@ -73,6 +74,22 @@ struct ws_client *output_client(struct ws_output *output) {
 	int center_x = output->output_box.x + output->output_box.width / 2;
 	int center_y = output->output_box.y + output->output_box.height / 2;
 	return client_at(output->server, center_x, center_y, NULL, NULL, NULL);
+}
+
+struct ws_output *output_at(struct ws_server *server, double lx, double ly) {
+	struct ws_output *output = output_only(NULL);
+	if (output) {
+		return output;
+	}
+
+	struct wlr_output *wlr_output =
+		wlr_output_layout_output_at(server->output_layout, lx, ly);
+	if (!wlr_output) {
+		wlr_log(WLR_ERROR, "failed to get client's output");
+		return NULL;
+	}
+
+	return wlr_output->data;
 }
 
 void output_position(struct ws_server *server) {

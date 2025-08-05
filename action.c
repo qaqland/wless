@@ -89,6 +89,7 @@ static struct ws_client *checkout_client(struct ws_server *server,
 		if (!local_check) {
 			break;
 		}
+		// when outputs is empty, both are NULL
 		if (client_output(des_client) == output) {
 			break;
 		}

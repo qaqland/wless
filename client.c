@@ -192,7 +192,7 @@ void client_focus(struct ws_client *new_client) {
 
 	struct ws_output *output = client_output(new_client);
 	// TODO
-	output_focus(output ? output : output_now(server));
+	output_focus(output);
 
 	wlr_xdg_toplevel_set_activated(new_client->xdg_toplevel, true);
 
@@ -249,6 +249,7 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 		new_y += (output_box.height - box.height) / 2;
 	} else {
 		// normally, a toplevel can cover the whole output
+		// TODO we should check max geometry of client
 		wlr_xdg_toplevel_set_size(client->xdg_toplevel,
 					  output_box.width, output_box.height);
 		wlr_xdg_toplevel_set_maximized(client->xdg_toplevel, true);

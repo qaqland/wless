@@ -19,6 +19,7 @@ struct ws_output {
 
 const char *output_name(struct ws_output *output);
 struct ws_client *output_client(struct ws_output *output);
+struct ws_output *output_at(struct ws_server *server, double lx, double ly);
 struct ws_output *output_now(struct ws_server *server);
 struct ws_output *output_only(void *update);
 void output_focus(struct ws_output *output);
