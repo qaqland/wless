@@ -1,13 +1,14 @@
 project(
     'wless',
     'c',
-    version: '0.0.1',
+    version: '0.0.2',
     default_options: ['warning_level=3', 'c_std=c2x'],
 )
 
 add_project_arguments(
-    '-DWLR_USE_UNSTABLE',
     '-D_POSIX_C_SOURCE=200809L',
+    '-DWLR_USE_UNSTABLE',
+    '-DWLESS_VERSION="@0@"'.format(meson.project_version()),
     language: 'c',
 )
 
@@ -19,6 +20,7 @@ sources = files('action.c', 'client.c', 'input.c', 'output.c', 'wless.c')
 
 subdir('protocol')
 
+varlink = dependency('libvarlink')
 wayland_server = dependency('wayland-server')
 wlroots = dependency('wlroots-0.19')
 xkbcommon = dependency('xkbcommon')

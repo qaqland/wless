@@ -10,38 +10,8 @@
 #include "action.h"
 #include "client.h"
 #include "input.h"
-// #include "output.h"
 #include "output.h"
 #include "wless.h"
-
-struct ws_client *client_at(struct ws_server *server, double lx, double ly,
-			    struct wlr_surface **out_surface, double *sx,
-			    double *sy) {
-	struct wlr_scene_node *node =
-		wlr_scene_node_at(&server->scene->tree.node, lx, ly, sx, sy);
-
-	if (!node || node->type != WLR_SCENE_NODE_BUFFER) {
-		return NULL;
-	}
-	struct wlr_scene_buffer *scene_buffer =
-		wlr_scene_buffer_from_node(node);
-	struct wlr_scene_surface *scene_surface =
-		wlr_scene_surface_try_from_buffer(scene_buffer);
-	if (!scene_surface) {
-		return NULL;
-	}
-
-	if (out_surface) {
-		*out_surface = scene_surface->surface;
-	}
-
-	// wlr_scene_node.data is set in handle_xdg_toplevel_map
-	struct wlr_scene_tree *tree = node->parent;
-	while (tree && tree->node.data == NULL) {
-		tree = tree->node.parent;
-	}
-	return tree->node.data;
-}
 
 void handle_cursor_button(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_button_event *event = data;
@@ -77,6 +47,7 @@ static void process_cursor_motion(struct ws_server *server, uint32_t time) {
 	// TODO if we should check NULL
 	struct ws_output *output =
 		output_at(server, server->cursor->x, server->cursor->y);
+	assert(output);
 	output_focus(output);
 
 	if (client) {

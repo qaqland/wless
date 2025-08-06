@@ -8,7 +8,6 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 
-#include "action.h"
 #include "client.h"
 #include "output.h"
 #include "wless.h"
@@ -97,6 +96,35 @@ static struct ws_client *client_from_surface(struct wlr_surface *surface) {
 	return NULL;
 }
 
+struct ws_client *client_at(struct ws_server *server, double lx, double ly,
+			    struct wlr_surface **out_surface, double *sx,
+			    double *sy) {
+	struct wlr_scene_node *node =
+		wlr_scene_node_at(&server->scene->tree.node, lx, ly, sx, sy);
+
+	if (!node || node->type != WLR_SCENE_NODE_BUFFER) {
+		return NULL;
+	}
+	struct wlr_scene_buffer *scene_buffer =
+		wlr_scene_buffer_from_node(node);
+	struct wlr_scene_surface *scene_surface =
+		wlr_scene_surface_try_from_buffer(scene_buffer);
+	if (!scene_surface) {
+		return NULL;
+	}
+
+	if (out_surface) {
+		*out_surface = scene_surface->surface;
+	}
+
+	// wlr_scene_node.data is set in handle_xdg_toplevel_map
+	struct wlr_scene_tree *tree = node->parent;
+	while (tree && tree->node.data == NULL) {
+		tree = tree->node.parent;
+	}
+	return tree->node.data;
+}
+
 struct ws_output *client_output(struct ws_client *client) {
 	assert(client);
 	struct ws_server *server = client->server;
@@ -111,28 +139,14 @@ struct ws_output *client_output(struct ws_client *client) {
 		return NULL;
 	}
 
-	// if client_position is triggered during an output_layout_change, then
-	// coordinate-based judgment will not be very accurate. therefore, we
-	// use the scene-based API for updates.
-
-	// current_output is inserted via wlr_surface_send_enter() and removed
-	// via wlr_surface_send_leave(). relevant event handlers are registered
-	// with wlr_scene_surface_create() function, which is triggered by:
-	// 	- wlr_scene_node_set_enabled()
-	// 	- wlr_scene_node_set_position()
-	// 	- wlr_scene_node_raise_to_top()
-
-	struct wl_list *surface_outputs =
-		&client->xdg_toplevel->base->surface->current_outputs;
-
-	if (wl_list_empty(surface_outputs)) {
+	struct wlr_box client_box = client->xdg_toplevel->base->geometry;
+	output = output_at(server, client_box.x, client_box.y);
+	if (!output) {
 		wlr_log(WLR_ERROR, "failed to get client's output");
 		return NULL;
 	}
 
-	struct wlr_surface_output *surface_output =
-		wl_container_of(surface_outputs->next, surface_output, link);
-	return surface_output->output->data;
+	return output;
 }
 
 void client_raise(struct ws_client *client) {
@@ -239,6 +253,11 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 		assert(output_box.height == layout_box.height);
 	}
 
+	{
+		int max_height = client->xdg_toplevel->current.max_height;
+		int max_width = client->xdg_toplevel->current.max_width;
+	}
+
 	int new_x = output_box.x;
 	int new_y = output_box.y;
 
@@ -271,8 +290,6 @@ void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 
 	// wlr_xdg_surface.data is used in handle_new_xdg_popup
 	client->xdg_toplevel->base->data = client->scene_tree;
-
-	// wlr_scene_node_raise_to_top(&toplevel->scene_tree->node);
 
 	struct ws_server *server = client->server;
 	assert(server->magic == 6);

@@ -24,10 +24,6 @@ struct ws_keyboard {
 	struct wl_listener destroy;
 };
 
-struct ws_client *client_at(struct ws_server *server, double lx, double ly,
-			    struct wlr_surface **out_surface, double *sx,
-			    double *sy);
-
 void handle_cursor_motion_absolute(struct wl_listener *listener, void *data);
 void handle_cursor_motion_relative(struct wl_listener *listener, void *data);
 void handle_cursor_button(struct wl_listener *listener, void *data);
