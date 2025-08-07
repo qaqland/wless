@@ -66,7 +66,13 @@ static struct ws_client *checkout_client(struct ws_server *server,
 
 	struct ws_output *only_output = output_only(NULL);
 	if (!src_client) {
-		if (only_output || local_check) {
+		if (only_output) {
+			wlr_log(WLR_ERROR, "when there is only one output, "
+					   "src_client should not be empty");
+			return NULL;
+		}
+		if (local_check) {
+			// normal early return :)
 			return NULL;
 		}
 		link = &server->clients;
@@ -74,8 +80,6 @@ static struct ws_client *checkout_client(struct ws_server *server,
 		link = &src_client->link;
 	}
 
-	// it makes no sense when there is only one output
-	local_check = only_output ? false : local_check;
 	struct ws_output *output = output_now(server);
 
 	for (;;) {
@@ -89,10 +93,10 @@ static struct ws_client *checkout_client(struct ws_server *server,
 		if (!local_check) {
 			break;
 		}
-		// when outputs is empty, both are NULL
-		if (client_output(des_client) == output) {
-			break;
+		if (client_output(des_client) != output) {
+			continue;
 		}
+		break;
 	}
 
 	if (des_client == src_client) {
@@ -145,6 +149,8 @@ void action_focus_done(struct ws_server *server) {
 		return;
 	}
 	client_focus(client);
+	struct ws_output *output = client_output(client);
+	output_focus(output);
 }
 
 // TODO
@@ -204,22 +210,16 @@ void action_close_window(struct ws_server *server, const char *command) {
 		return;
 	}
 
-	struct ws_client *client = client_zero(server);
-	if (client_now(server) != client) {
+	struct ws_client *client = client_now(server);
+	if (!client) {
 		return;
 	}
 
 	// FIXME what happend
 	wlr_xdg_toplevel_send_close(client->xdg_toplevel);
 
-	// it is not blocked, just send event to client
-	// so we should not do more actions here
-
-	// struct ws_client *next_client = checkout_client(server, false, true);
-	// if (!next_client) {
-	// 	return;
-	// }
-	// client_focus(next_client);
+	// it is not blocked to wait close, only send event to client, so we
+	// should not do more actions here
 }
 
 void action_quit(struct ws_server *server, const char *command) {

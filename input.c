@@ -23,6 +23,12 @@ void handle_cursor_button(struct wl_listener *listener, void *data) {
 	}
 	wlr_seat_pointer_notify_button(server->seat, event->time_msec,
 				       event->button, event->state);
+	struct ws_client *client = client_at(
+		server, server->cursor->x, server->cursor->y, NULL, NULL, NULL);
+	struct ws_output *output =
+		output_at(server, server->cursor->x, server->cursor->y);
+	output_focus(output);
+	client_focus(client);
 }
 
 void handle_cursor_axis(struct wl_listener *listener, void *data) {
@@ -43,16 +49,7 @@ static void process_cursor_motion(struct ws_server *server, uint32_t time) {
 		client_at(server, server->cursor->x, server->cursor->y,
 			  &surface, &sx, &sy);
 
-	// output should always valid
-	// TODO if we should check NULL
-	struct ws_output *output =
-		output_at(server, server->cursor->x, server->cursor->y);
-	assert(output);
-	output_focus(output);
-
-	if (client) {
-		client_focus(client);
-	} else {
+	if (!client) {
 		wlr_cursor_set_xcursor(server->cursor, server->xcursor_manager,
 				       "default");
 	}

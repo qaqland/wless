@@ -8,9 +8,9 @@
 #include <wlr/util/log.h>
 
 #include "client.h"
-#include "input.h"
 #include "output.h"
 #include "wless.h"
+#include "wlr/util/box.h"
 
 const char *output_name(struct ws_output *output) {
 	if (!output) {
@@ -57,22 +57,25 @@ struct ws_output *output_now(struct ws_server *server) {
 }
 
 void output_focus(struct ws_output *output) {
-	// TODO if we should check NULL
-	assert(output);
+	if (!output) {
+		return;
+	}
+
 	struct ws_server *server = output->server;
 	assert(server->magic == 6);
 
 	if (output == output_now(server)) {
 		return;
 	}
+	wlr_log(WLR_DEBUG, "output_focus: %s", output_name(output));
 	wl_list_remove(&output->link); // safe?
 	wl_list_insert(&server->outputs, &output->link);
 	return;
 }
 
 struct ws_client *output_client(struct ws_output *output) {
-	int center_x = output->output_box.x + output->output_box.width / 2;
-	int center_y = output->output_box.y + output->output_box.height / 2;
+	double center_x = output->output_box.x + output->output_box.width / 2.;
+	double center_y = output->output_box.y + output->output_box.height / 2.;
 	return client_at(output->server, center_x, center_y, NULL, NULL, NULL);
 }
 
@@ -99,19 +102,19 @@ void output_position(struct ws_server *server) {
 		return;
 	}
 
-	// FIXME
-	// why kanshi trigged this function run three times?
-
 	// update output geometry: output->output_box
 	struct ws_output *output;
 	wl_list_for_each (output, &server->outputs, link) {
-		struct wlr_box *layout_box = &output->output_box;
+		struct wlr_box layout_box = output->output_box;
 		wlr_output_layout_get_box(server->output_layout,
-					  output->wlr_output, layout_box);
-		wlr_log(WLR_INFO, "output %s (%p): (%4d, %4d, %4d, %4d)",
-			output_name(output), (void *) output->wlr_output,
-			layout_box->x, layout_box->y, layout_box->width,
-			layout_box->height);
+					  output->wlr_output,
+					  &output->output_box);
+		if (wlr_box_equal(&layout_box, &output->output_box)) {
+			continue;
+		}
+		wlr_log(WLR_INFO, "output_position %s: (%d, %d, %d, %d)",
+			output_name(output), layout_box.x, layout_box.y,
+			layout_box.width, layout_box.height);
 	}
 
 	// if only one output, we can appoint it

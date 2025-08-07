@@ -126,7 +126,10 @@ struct ws_client *client_at(struct ws_server *server, double lx, double ly,
 }
 
 struct ws_output *client_output(struct ws_client *client) {
-	assert(client);
+	if (!client) {
+		return NULL;
+	}
+
 	struct ws_server *server = client->server;
 	assert(server->magic == 6);
 
@@ -160,10 +163,11 @@ void client_raise(struct ws_client *client) {
 }
 
 void client_blur(struct ws_client *client) {
-	assert(client);
+	if (!client) {
+		return;
+	}
+
 	assert(client->server->magic == 6);
-	// TODO there should be only one case: blur client_zero
-	// assert(client == client_zero(client->server));
 
 	wlr_log(WLR_INFO, "client_blur: %s (%p)", client_title(client),
 		(void *) client);
@@ -175,7 +179,9 @@ void client_blur(struct ws_client *client) {
 // 或者 seat 那边的事件来自动做，避免手动调用
 
 void client_focus(struct ws_client *new_client) {
-	assert(new_client);
+	if (!new_client) {
+		return;
+	}
 	struct ws_server *server = new_client->server;
 	assert(server->magic == 6);
 
@@ -191,22 +197,12 @@ void client_focus(struct ws_client *new_client) {
 	}
 
 	struct ws_client *old_client = client_from_surface(old_surface);
-	if (old_client) {
-		assert(old_client->server->magic == 6);
-		wlr_log(WLR_INFO, "[client] old_focus >>> %s: %p",
-			client_title(old_client), (void *) old_client);
-		wlr_xdg_toplevel_set_activated(old_client->xdg_toplevel, false);
-	}
-
-	wlr_log(WLR_INFO, "[client] new_focus >>> %s: %p",
-		client_title(new_client), (void *) new_client);
+	client_blur(old_client);
 
 	wl_list_remove(&new_client->link);
 	wl_list_insert(&server->clients, &new_client->link);
-
-	struct ws_output *output = client_output(new_client);
-	// TODO
-	output_focus(output);
+	wlr_log(WLR_INFO, "client_focus: %s (%p)", client_title(new_client),
+		(void *) new_client);
 
 	wlr_xdg_toplevel_set_activated(new_client->xdg_toplevel, true);
 
@@ -311,15 +307,10 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	struct ws_server *server = client->server;
 	assert(server->magic == 6);
 
-	// FIXME
-	// action_focus_done vs client_focus
-	// action_focus_done(server);
-
 	struct ws_client *next_client = client_zero(server);
-	if (!next_client) {
-		return;
-	}
 	client_focus(next_client);
+	struct ws_output *next_output = client_output(next_client);
+	output_focus(next_output);
 }
 
 void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
