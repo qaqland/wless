@@ -133,23 +133,7 @@ struct ws_output *client_output(struct ws_client *client) {
 	struct ws_server *server = client->server;
 	assert(server->magic == 6);
 
-	struct ws_output *output = output_only(NULL);
-	if (output) {
-		return output;
-	}
-
-	if (wl_list_empty(&server->outputs)) {
-		return NULL;
-	}
-
-	struct wlr_box client_box = client->xdg_toplevel->base->geometry;
-	output = output_at(server, client_box.x, client_box.y);
-	if (!output) {
-		wlr_log(WLR_ERROR, "failed to get client's output");
-		return NULL;
-	}
-
-	return output;
+	return client->output;
 }
 
 void client_raise(struct ws_client *client) {
@@ -222,15 +206,11 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 
 	wlr_log(WLR_INFO, "client_position");
 
-	struct wlr_box *client_box = &client->xdg_toplevel->base->geometry;
-	wlr_log(WLR_INFO, "[client] %s >>> x:%d, y: %d, w: %d, h: %d",
-		client_title(client), client_box->x, client_box->y,
-		client_box->width, client_box->height);
-
-	if (!output) {
+	if (output) {
+		client->output = output;
+	} else {
 		output = client_output(client);
 	}
-	assert(output->server->magic == 6);
 
 	struct wlr_box output_box = output->output_box;
 
@@ -249,29 +229,28 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 		assert(output_box.height == layout_box.height);
 	}
 
-	{
-		int max_height = client->xdg_toplevel->current.max_height;
-		int max_width = client->xdg_toplevel->current.max_width;
-	}
+	// int margin = 0;
+	int max_height = client->xdg_toplevel->current.max_height;
+	int max_width = client->xdg_toplevel->current.max_width;
 
-	int new_x = output_box.x;
-	int new_y = output_box.y;
+	struct wlr_box client_box = {0};
+	client_box.height = (max_height < output_box.height && max_height != 0)
+				    ? max_height
+				    : output_box.height;
+	client_box.width = (max_width < output_box.width && max_width != 0)
+				   ? max_width
+				   : output_box.width;
 
-	// TODO 为什么不使用 xdg_surface->role
-	if (client->xdg_toplevel->parent) {
-		struct wlr_box box = client->xdg_toplevel->base->geometry;
-		new_x += (output_box.width - box.width) / 2;
-		new_y += (output_box.height - box.height) / 2;
-	} else {
-		// normally, a toplevel can cover the whole output
-		// TODO we should check max geometry of client
-		wlr_xdg_toplevel_set_size(client->xdg_toplevel,
-					  output_box.width, output_box.height);
-		wlr_xdg_toplevel_set_maximized(client->xdg_toplevel, true);
-		new_x = output_box.x;
-		new_y = output_box.y;
-	}
-	wlr_scene_node_set_position(&client->scene_tree->node, new_x, new_y);
+	client_box.x = output_box.x + (output_box.width - client_box.width) / 2;
+	client_box.y =
+		output_box.y + (output_box.height - client_box.height) / 2;
+
+	wlr_xdg_toplevel_set_size(client->xdg_toplevel, client_box.width,
+				  client_box.height);
+	wlr_xdg_toplevel_set_maximized(client->xdg_toplevel, true);
+
+	wlr_scene_node_set_position(&client->scene_tree->node, client_box.x,
+				    client_box.y);
 }
 
 void xdg_toplevel_map(struct wl_listener *listener, void *data) {
@@ -308,9 +287,9 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	assert(server->magic == 6);
 
 	struct ws_client *next_client = client_zero(server);
-	client_focus(next_client);
 	struct ws_output *next_output = client_output(next_client);
 	output_focus(next_output);
+	client_focus(next_client);
 }
 
 void xdg_toplevel_commit(struct wl_listener *listener, void *data) {

@@ -92,7 +92,11 @@ struct ws_output *output_at(struct ws_server *server, double lx, double ly) {
 		return NULL;
 	}
 
-	return wlr_output->data;
+	output = wlr_output->data;
+	wlr_log(WLR_DEBUG, "output_at(%f, %f): %s", lx, ly,
+		output_name(output));
+
+	return output;
 }
 
 void output_position(struct ws_server *server) {
@@ -109,9 +113,6 @@ void output_position(struct ws_server *server) {
 		wlr_output_layout_get_box(server->output_layout,
 					  output->wlr_output,
 					  &output->output_box);
-		if (wlr_box_equal(&layout_box, &output->output_box)) {
-			continue;
-		}
 		wlr_log(WLR_INFO, "output_position %s: (%d, %d, %d, %d)",
 			output_name(output), layout_box.x, layout_box.y,
 			layout_box.width, layout_box.height);

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_keyboard.h>
+#include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
@@ -42,45 +43,35 @@ static bool change_vt(struct ws_server *server, uint32_t modifiers,
 	return true;
 }
 
-static struct ws_client *checkout_client(struct ws_server *server,
-					 bool local_check, bool want_next) {
+static void checkout_client(struct ws_server *server, bool local_check,
+			    bool want_next) {
 	assert(server->magic == 6);
 
 	if (wl_list_empty(&server->clients)) {
-		return NULL;
+		return;
 	}
 
-	//	single	multiple
-	// Alt	1	2
-	// Win	3	4
-	//
-	// 1: now > next > ok
-	// 2: now > zero > next > ok
-	// 3: now > next > ok
-	// 4: now > next > check > ok
+	struct ws_output *src_output = output_now(server);
+	struct ws_output *des_output = NULL;
 
-	struct ws_client *src_client = client_now(server);
+	struct ws_client *src_client = output_client(src_output);
 	struct ws_client *des_client = NULL;
+
+	if (!src_client && (local_check || output_only(NULL))) {
+		wlr_log(WLR_INFO,
+			"checkout_client early return, src_client: %s, "
+			"src_output: %s",
+			client_title(src_client), output_name(src_output));
+		return;
+	}
 
 	struct wl_list *link = NULL;
 
-	struct ws_output *only_output = output_only(NULL);
-	if (!src_client) {
-		if (only_output) {
-			wlr_log(WLR_ERROR, "when there is only one output, "
-					   "src_client should not be empty");
-			return NULL;
-		}
-		if (local_check) {
-			// normal early return :)
-			return NULL;
-		}
-		link = &server->clients;
-	} else {
+	if (src_client) {
 		link = &src_client->link;
+	} else {
+		link = &server->clients;
 	}
-
-	struct ws_output *output = output_now(server);
 
 	for (;;) {
 		link = want_next ? link->next : link->prev;
@@ -90,67 +81,59 @@ static struct ws_client *checkout_client(struct ws_server *server,
 		des_client = wl_container_of(link, des_client, link);
 		assert(des_client->server->magic == 6);
 
+		des_output = client_output(des_client);
+		wlr_log(WLR_DEBUG, "checking, des_client: %s, des_output: %s",
+			client_title(des_client), output_name(des_output));
 		if (!local_check) {
 			break;
 		}
-		if (client_output(des_client) != output) {
-			continue;
+
+		if (des_output == src_output) {
+			break;
 		}
-		break;
 	}
 
 	if (des_client == src_client) {
-		return NULL;
-	} else {
-		return des_client;
+		return;
 	}
+
+	output_focus(des_output);
+	wlr_scene_node_raise_to_top(&des_client->scene_tree->node);
 }
 
 void action_next_window(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
-	struct ws_client *client = checkout_client(server, false, true);
-	client_raise(client);
+	checkout_client(server, false, true);
 }
 
 void action_prev_window(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
-	struct ws_client *client = checkout_client(server, false, false);
-	client_raise(client);
+	checkout_client(server, false, false);
 }
 
 void action_next_window_local(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
-	struct ws_client *client = checkout_client(server, true, true);
-	client_raise(client);
+	checkout_client(server, true, true);
 }
 
 void action_prev_window_local(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
 
-	struct ws_client *client = checkout_client(server, true, false);
-	client_raise(client);
+	checkout_client(server, true, false);
 }
 
 void action_focus_done(struct ws_server *server) {
 	assert(server->magic == 6);
 
 	struct ws_client *client = client_now(server);
-	if (!client) {
-		return;
-	}
-	if (client == client_zero(server)) {
-		return;
-	}
 	client_focus(client);
-	struct ws_output *output = client_output(client);
-	output_focus(output);
 }
 
 // TODO
@@ -289,11 +272,6 @@ bool action_main(struct ws_server *server, uint32_t modifiers,
 	// ALT+CTRL+F1
 	if (change_vt(server, modifiers, keysym)) {
 		return true;
-	}
-
-	// TODO: more canonical
-	if (keysym == XKB_KEY_ISO_Left_Tab) {
-		keysym = XKB_KEY_Tab;
 	}
 
 	const struct ws_key_bind *key;

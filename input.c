@@ -6,6 +6,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/util/log.h>
+#include <xkbcommon/xkbcommon-keysyms.h>
 
 #include "action.h"
 #include "client.h"
@@ -128,23 +129,31 @@ static void keyboard_handle_key(struct wl_listener *listener, void *data) {
 	struct ws_keyboard *keyboard = wl_container_of(listener, keyboard, key);
 	struct wlr_keyboard_key_event *event = data;
 
-	struct wlr_seat *seat = keyboard->server->seat;
+	struct ws_server *server = keyboard->server;
+	struct wlr_seat *seat = server->seat;
+	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
 
 	xkb_keycode_t keycode = event->keycode + 8;
 	xkb_keysym_t keysym = xkb_state_key_get_one_sym(
 		keyboard->wlr_keyboard->xkb_state, keycode);
-	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
+
+	// TODO: more canonical
+	if (keysym == XKB_KEY_ISO_Left_Tab) {
+		keysym = XKB_KEY_Tab;
+	}
 
 	bool handled = false;
 	switch (event->state) {
 	case WL_KEYBOARD_KEY_STATE_PRESSED:
-		handled = action_main(keyboard->server, modifiers, keysym);
+		handled = action_main(server, modifiers, keysym);
 		break;
 	case WL_KEYBOARD_KEY_STATE_RELEASED:
-		if (keysym == XKB_KEY_Alt_L || keysym == XKB_KEY_Super_L) {
-			wlr_log(WLR_DEBUG, "[key] RELEASE: Alt_L / Super_L");
-			// for alt+tab and super+tab
-			action_focus_done(keyboard->server);
+		switch (keysym) {
+		case XKB_KEY_Alt_L:  // Alt
+		case XKB_KEY_Meta_L: // Shift + Alt
+		case XKB_KEY_Super_L:
+			action_focus_done(server);
+			wlr_log(WLR_DEBUG, "release super/alt");
 		}
 		break;
 	case WL_KEYBOARD_KEY_STATE_REPEATED:
@@ -155,7 +164,7 @@ static void keyboard_handle_key(struct wl_listener *listener, void *data) {
 	if (handled) {
 		static char name_buf[64];
 		xkb_keysym_get_name(keysym, name_buf, 64);
-		wlr_log(WLR_DEBUG, "[key] HANDLED: %s", name_buf);
+		wlr_log(WLR_DEBUG, "handle XKB_KEY_%s", name_buf);
 		return;
 	}
 

@@ -11,6 +11,7 @@ struct ws_client {
 	struct ws_server *server;
 	struct wlr_xdg_toplevel *xdg_toplevel;
 	struct wlr_scene_tree *scene_tree;
+	struct ws_output *output;
 
 	struct wl_list link; // ws_server.clients
 
@@ -36,6 +37,9 @@ struct ws_xdg_decoration {
 	struct wl_listener commit;
 	struct wl_listener request_mode;
 };
+
+const char *client_app_id(struct ws_client *client);
+const char *client_title(struct ws_client *client);
 
 struct ws_output *client_output(struct ws_client *client);
 
