@@ -1,6 +1,6 @@
 # wless(WIP)
 
-window less, wlroots based wayland compositor.
+Window LESS, monocle style wayland compositor.
 
 ## Install(WIP)
 
@@ -38,22 +38,29 @@ makedepends="
 - <kbd>Super</kbd> + <kbd>Space</kbd>
 - <kbd>Super</kbd> + <kbd>0..9</kbd>
 - <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>0..9</kbd>
-- <kbd>Super</kbd> + <kbd>N</kbd>
-- <kbd>Super</kbd> + <kbd>P</kbd>
-- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>N</kbd>
-- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>P</kbd>
+- <kbd>Super</kbd> + <kbd>,</kbd>
+- <kbd>Super</kbd> + <kbd>.</kbd>
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>,</kbd>
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>.</kbd>
 
 ## Output Mode Settings
 
 - wlr-randr
 - <https://github.com/emersion/kanshi>
 
+## License
+
+* All rights reserved.
+* No guarantees are made regarding its usability or functionality.
+* This is a hobby project created in my spare time.
+* Currently not accepting external code contributions.
+
 ## Acknowledgements
 
 - tinywl(wlroots), cage, dwl
 - @DreamMaoMao
 
-A special thanks to @vaaandark for giving me the monitor
+Thanks to @vaaandark for donating me monitor to help develop wless.
 
 ```bash
 $ wlr-randr
