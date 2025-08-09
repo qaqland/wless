@@ -161,10 +161,14 @@ static void keyboard_handle_key(struct wl_listener *listener, void *data) {
 		break;
 	}
 
+#ifndef NDEBUG
+	// WARNING, it's dangerous to record
+	static char name_buf[64];
+	xkb_keysym_get_name(keysym, name_buf, 64);
+	wlr_log(WLR_DEBUG, ">>> XKB_KEY_%s", name_buf);
+#endif
+
 	if (handled) {
-		static char name_buf[64];
-		xkb_keysym_get_name(keysym, name_buf, 64);
-		wlr_log(WLR_DEBUG, "handle XKB_KEY_%s", name_buf);
 		return;
 	}
 

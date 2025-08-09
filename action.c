@@ -7,6 +7,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/util/log.h>
+#include <xkbcommon/xkbcommon-keysyms.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "action.h"
@@ -136,24 +137,40 @@ void action_focus_done(struct ws_server *server) {
 	client_focus(client);
 }
 
+static void checkout_output(struct ws_server *server, bool move_client) {
+	assert(server->magic == 6);
+
+	if (output_only(NULL) || wl_list_empty(&server->outputs)) {
+		return;
+	}
+
+	struct ws_client *client = client_now(server);
+	struct ws_output *output =
+		wl_container_of(server->outputs.prev, output, link);
+
+	assert(output->server->magic == 6);
+
+	if (move_client) {
+		client_position(client, output);
+		client_raise(client);
+	}
+	output_focus(output);
+	client_focus(client_now(server));
+}
+
 // TODO
-void action_next_display(struct ws_server *server, const char *command) {
+void action_switch_display(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
+
+	checkout_output(server, false);
 }
 
-void action_prev_display(struct ws_server *server, const char *command) {
+void action_shift_client(struct ws_server *server, const char *command) {
 	assert(server->magic == 6);
 	assert(!command);
-}
 
-void action_move_next(struct ws_server *server, const char *command) {
-	assert(server->magic == 6);
-	assert(!command);
-}
-void action_move_prev(struct ws_server *server, const char *command) {
-	assert(server->magic == 6);
-	assert(!command);
+	checkout_output(server, true);
 }
 
 void action_exec(struct ws_server *server, const char *command) {
@@ -239,6 +256,19 @@ const struct ws_key_bind action_keybinds[] = {
 		WLR_MODIFIER_LOGO | WLR_MODIFIER_SHIFT,
 		XKB_KEY_Tab,
 		action_prev_window_local,
+		NULL,
+
+	},
+	{
+		WLR_MODIFIER_LOGO,
+		XKB_KEY_period,
+		action_switch_display,
+		NULL,
+	},
+	{
+		WLR_MODIFIER_LOGO | WLR_MODIFIER_SHIFT,
+		XKB_KEY_greater,
+		action_shift_client,
 		NULL,
 
 	},

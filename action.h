@@ -15,13 +15,8 @@ void action_prev_window_local(struct ws_server *server, const char *command);
 
 void action_focus_done(struct ws_server *server);
 
-// switch display
-void action_next_display(struct ws_server *server, const char *command);
-void action_prev_display(struct ws_server *server, const char *command);
-
-// move window
-void action_move_next(struct ws_server *server, const char *command);
-void action_move_prev(struct ws_server *server, const char *command);
+void action_switch_display(struct ws_server *server, const char *command);
+void action_shift_client(struct ws_server *server, const char *command);
 
 // others
 void action_exec(struct ws_server *server, const char *command);
