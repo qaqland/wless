@@ -16,18 +16,10 @@ if get_option('buildtype').startswith('debug')
     add_project_arguments('-DDEBUG', language: 'c')
 endif
 
-sources = files(
-    'action.c',
-    'client.c',
-    'input.c',
-    'ipc.c',
-    'output.c',
-    'wless.c',
-)
+sources = files('action.c', 'client.c', 'input.c', 'output.c', 'wless.c')
 
 subdir('protocol')
 
-varlink = dependency('libvarlink')
 wayland_server = dependency('wayland-server')
 wlroots = dependency('wlroots-0.19')
 xkbcommon = dependency('xkbcommon')
@@ -36,5 +28,5 @@ executable(
     'wless',
     sources,
     install: true,
-    dependencies: [varlink, wayland_server, wlroots, xkbcommon],
+    dependencies: [wayland_server, wlroots, xkbcommon],
 )
