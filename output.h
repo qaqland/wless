@@ -24,6 +24,7 @@ struct ws_output *output_now(struct ws_server *server);
 struct ws_output *output_only(void *update);
 void output_focus(struct ws_output *output);
 void output_position(struct ws_server *server);
+void output_set_border(struct ws_server *server, bool enabled);
 
 void handle_new_output(struct wl_listener *listener, void *data);
 

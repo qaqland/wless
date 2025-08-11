@@ -99,6 +99,59 @@ struct ws_output *output_at(struct ws_server *server, double lx, double ly) {
 	return output;
 }
 
+void output_set_border(struct ws_server *server, bool enabled) {
+	// actually, it shows border around client
+	assert(server->magic == 6);
+
+	static struct wlr_scene_rect *border[4];
+
+	const float color[] = {0, 0.5, 1, 1};
+
+	if (!border[0]) {
+		for (int i = 0; i < 4; i++) {
+			border[i] = wlr_scene_rect_create(&server->scene->tree,
+							  0, 0, color);
+		}
+	}
+
+	for (int i = 0; i < 4; i++) {
+		wlr_scene_node_raise_to_top(&border[i]->node);
+		wlr_scene_node_set_enabled(&border[i]->node, enabled);
+	}
+
+	if (!enabled) {
+		return;
+	}
+
+	struct ws_output *output = output_now(server);
+	struct wlr_box border_box = output->output_box;
+
+	struct ws_client *client = client_now(server);
+	if (client) {
+		struct wlr_box client_box =
+			client->xdg_toplevel->base->geometry;
+
+		border_box.x += (border_box.width - client_box.width) / 2;
+		border_box.y += (border_box.height - client_box.height) / 2;
+	}
+
+	int padding = 5;
+	wlr_scene_rect_set_size(border[0], border_box.width, padding);
+	wlr_scene_rect_set_size(border[1], padding, border_box.height);
+	wlr_scene_rect_set_size(border[2], border_box.width, padding);
+	wlr_scene_rect_set_size(border[3], padding, border_box.height);
+
+	wlr_scene_node_set_position(&border[0]->node, border_box.x,
+				    border_box.y);
+	wlr_scene_node_set_position(&border[1]->node,
+				    border_box.x + border_box.width - padding,
+				    border_box.y);
+	wlr_scene_node_set_position(&border[2]->node, border_box.x,
+				    border_box.y + border_box.height - padding);
+	wlr_scene_node_set_position(&border[3]->node, border_box.x,
+				    border_box.y);
+}
+
 void output_position(struct ws_server *server) {
 	assert(server->magic == 6);
 
