@@ -1,6 +1,6 @@
 # wless(WIP)
 
-Window LESS, monocle style wayland compositor.
+window-less, a monocle-style wayland compositor based on wlroots.
 
 ## Install(WIP)
 
@@ -24,24 +24,22 @@ makedepends="
 
 ## Key bindings
 
-- <kbd>Super</kbd> + <kbd>Enter</kbd>
-- <kbd>Super</kbd> + <kbd>W</kbd>
-- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>Esc</kbd>
-- <kbd>Alt</kbd> + <kbd>Tab</kbd>
-- <kbd>Alt</kbd> + <kbd>Shfit</kbd> + <kbd>Tab</kbd>
-- <kbd>Super</kbd> + <kbd>Tab</kbd>
-- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>Tab</kbd>
+- <kbd>Super</kbd> + <kbd>Enter</kbd> start foot terminal
+- <kbd>Super</kbd> + <kbd>W</kbd> close window
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>Esc</kbd> quit wless
+- <kbd>Alt</kbd> + <kbd>Tab</kbd> switch windows
+- <kbd>Alt</kbd> + <kbd>Shfit</kbd> + <kbd>Tab</kbd> switch windows (reverse)
+- <kbd>Super</kbd> + <kbd>Tab</kbd> switch windows (same output)
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>Tab</kbd> switch windows (same output, reverse)
+- <kbd>Super</kbd> + <kbd>.</kbd> switch outputs
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>.</kbd> move client between outputs
 
 ### TODO
 
-- <kbd>Super</kbd> + <kbd>R</kbd>
-- <kbd>Super</kbd> + <kbd>Space</kbd>
-- <kbd>Super</kbd> + <kbd>0..9</kbd>
-- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>0..9</kbd>
-- <kbd>Super</kbd> + <kbd>,</kbd>
-- <kbd>Super</kbd> + <kbd>.</kbd>
-- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>,</kbd>
-- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>.</kbd>
+- <kbd>Super</kbd> + <kbd>R</kbd> starter menu
+- <kbd>Super</kbd> + <kbd>Space</kbd> switcher menu
+- <kbd>Super</kbd> + <kbd>0..9</kbd> exec-or-jump
+- <kbd>Super</kbd> + <kbd>Shfit</kbd> + <kbd>0..9</kbd> force-exec
 
 ## Output Mode Settings
 
@@ -50,7 +48,7 @@ makedepends="
 
 ## License
 
-* All rights reserved.
+* All rights reserved (WIP).
 * No guarantees are made regarding its usability or functionality.
 * This is a hobby project created in my spare time.
 * Currently not accepting external code contributions.
