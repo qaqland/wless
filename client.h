@@ -41,8 +41,6 @@ struct ws_xdg_decoration {
 const char *client_app_id(struct ws_client *client);
 const char *client_title(struct ws_client *client);
 
-struct ws_output *client_output(struct ws_client *client);
-
 void client_raise(struct ws_client *client);
 void client_focus(struct ws_client *client);
 

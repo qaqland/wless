@@ -260,7 +260,7 @@ static void output_handle_destroy(struct wl_listener *listener, void *data) {
 
 	struct ws_client *client;
 	wl_list_for_each (client, &server->clients, link) {
-		if (client_output(client) != output) {
+		if (client->output != output) {
 			continue;
 		}
 		client_position(client, new_output);

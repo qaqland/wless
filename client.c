@@ -125,17 +125,6 @@ struct ws_client *client_at(struct ws_server *server, double lx, double ly,
 	return tree->node.data;
 }
 
-struct ws_output *client_output(struct ws_client *client) {
-	if (!client) {
-		return NULL;
-	}
-
-	struct ws_server *server = client->server;
-	assert(server->magic == 6);
-
-	return client->output;
-}
-
 void client_raise(struct ws_client *client) {
 	if (!client) {
 		return;
@@ -199,8 +188,10 @@ void client_focus(struct ws_client *new_client) {
 }
 
 void client_position(struct ws_client *client, struct ws_output *output) {
-	assert(client);
-	assert(client->scene_tree);
+	if (!client) {
+		return;
+	}
+
 	struct ws_server *server = client->server;
 	assert(server->magic == 6);
 
@@ -209,25 +200,10 @@ void client_position(struct ws_client *client, struct ws_output *output) {
 	if (output) {
 		client->output = output;
 	} else {
-		output = client_output(client);
+		output = client->output;
 	}
 
 	struct wlr_box output_box = output->output_box;
-
-	{
-		struct wlr_box layout_box = {0};
-		wlr_output_layout_get_box(server->output_layout,
-					  output->wlr_output, &layout_box);
-
-		wlr_log(WLR_INFO, "[output] %s >>> x: %d, y: %d, w: %d, h: %d",
-			output_name(output), layout_box.x, output_box.y,
-			layout_box.width, output_box.height);
-
-		assert(output_box.x == layout_box.x);
-		assert(output_box.y == layout_box.y);
-		assert(output_box.width == layout_box.width);
-		assert(output_box.height == layout_box.height);
-	}
 
 	// int margin = 0;
 	int max_height = client->xdg_toplevel->current.max_height;
@@ -287,7 +263,7 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	assert(server->magic == 6);
 
 	struct ws_client *next_client = client_zero(server);
-	struct ws_output *next_output = client_output(next_client);
+	struct ws_output *next_output = next_client->output;
 	output_focus(next_output);
 	client_focus(next_client);
 }

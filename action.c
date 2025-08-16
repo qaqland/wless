@@ -82,7 +82,7 @@ static void checkout_client(struct ws_server *server, bool local_check,
 		des_client = wl_container_of(link, des_client, link);
 		assert(des_client->server->magic == 6);
 
-		des_output = client_output(des_client);
+		des_output = des_client->output;
 		wlr_log(WLR_DEBUG, "checking, des_client: %s, des_output: %s",
 			client_title(des_client), output_name(des_output));
 		if (!local_check) {
@@ -150,7 +150,7 @@ static void checkout_output(struct ws_server *server, bool move_client) {
 
 	assert(output->server->magic == 6);
 
-	if (move_client) {
+	if (move_client && client) {
 		client_position(client, output);
 		client_raise(client);
 	}
