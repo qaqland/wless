@@ -263,7 +263,11 @@ void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	assert(server->magic == 6);
 
 	struct ws_client *next_client = client_zero(server);
+	if (!next_client) {
+		return;
+	}
 	struct ws_output *next_output = next_client->output;
+	assert(next_output);
 	output_focus(next_output);
 	client_focus(next_client);
 }
