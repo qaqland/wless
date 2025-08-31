@@ -4,7 +4,7 @@ window-less, a monocle-style wayland compositor based on wlroots.
 
 ## Install(WIP)
 
-The officially supported Linux distributions are Alpine Linux and Deepin.
+The officially supported Linux distributions are Alpine Linux and deepin Linux.
 
 ## Compile
 
@@ -48,10 +48,7 @@ makedepends="
 
 ## License
 
-* All rights reserved (WIP).
-* No guarantees are made regarding its usability or functionality.
-* This is a hobby project created in my spare time.
-* Currently not accepting external code contributions.
+MIT
 
 ## Acknowledgements
 
