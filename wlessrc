@@ -1,0 +1,10 @@
+# version
+	# comment
+-o alt,shift,key=l,cmd=hello
+-o alt,shift,key=l,cmd=helloworld
+-o alt,key=tab,cmd=switch
+-o ctrl,key=c,cmd="copy foo"
+-o "ctrl,key=v,cmd=paste bar"
+
+-s kanshi
+-s "foot server"

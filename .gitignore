@@ -1,0 +1,7 @@
+*.out
+.cache
+TODO
+build
+core
+tags
+log
